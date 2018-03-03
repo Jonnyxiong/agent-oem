@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:tx="http://www.springframework.org/schema/tx" xmlns:mybatis="http://mybatis.org/schema/mybatis-spring"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd
+		http://mybatis.org/schema/mybatis-spring http://mybatis.org/schema/mybatis-spring.xsd">
+
+	<bean id="message_dataSource" parent="dataSourceParent">
+		<property name="jdbcUrl" value="${ucpaas_message.jdbc.url}" />
+		<property name="username" value="${ucpaas_message.jdbc.username}" />
+		<property name="password" value="${ucpaas_message.jdbc.password}" />
+	</bean>
+
+	<bean id="message_sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="message_dataSource" />
+		<property name="configLocation" value="classpath:mybatis-config.xml" />
+		<property name="mapperLocations" value="classpath*:mapper/**/*Mapper.xml" />
+	</bean>
+
+	<bean id="message_sqlSessionTemplate" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg name="sqlSessionFactory" ref="message_sqlSessionFactory" />
+	</bean>
+	
+	<bean id="message_transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="message_dataSource" />
+	</bean>
+
+	<tx:annotation-driven transaction-manager="message_transactionManager" />
+
+	<bean id="message_dataSource_1" parent="dataSourceParent">
+		<property name="jdbcUrl" value="${ucpaas_message.jdbc.url}" />
+		<property name="username" value="${ucpaas_message.jdbc.username}" />
+		<property name="password" value="${ucpaas_message.jdbc.password}" />
+	</bean>
+
+	<bean id="message_sqlSessionFactory_1" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="message_dataSource_1" />
+		<property name="configLocation" value="classpath:mybatis-config.xml" />
+		<property name="plugins">
+			<ref bean="jsmsPageInterceptor" />
+		</property>
+	</bean>
+
+	<bean id="message_sqlSessionTemplate_1" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg name="sqlSessionFactory" ref="message_sqlSessionFactory_1" />
+	</bean>
+
+	<bean id="message_transactionManager_1" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="message_dataSource_1" />
+		<qualifier value="message_master" />
+	</bean>
+
+	<tx:annotation-driven transaction-manager="message_transactionManager_1" />
+
+	<!-- 扫描mapper-->
+	<!-- 因为在java使用mapper对象时，并不知道连的是那个库，所以mapper需根据库去分开包放-->
+	<mybatis:scan base-package="com.ucpaas.sms.mapper.message,com.jsmsframework.common.mapper,com.jsmsframework.order.mapper,com.jsmsframework.channel.mapper,com.jsmsframework.audit.mapper, com.jsmsframework.finance.mapper,com.jsmsframework.user.mapper,com.jsmsframework.user.*.mapper,com.jsmsframework.product.mapper,com.jsmsframework.sms.send.mapper,com.jsmsframework.middleware.mapper,com.jsmsframework.monitor.mapper"  template-ref="message_sqlSessionTemplate_1"/>
+	<!--<mybatis:scan base-package="com.ucpaas.sms.mapper.message,com.jsmsframework.*.mapper,,com.jsmsframework.sms.send.mapper"  template-ref="message_sqlSessionTemplate_1"/>-->
+</beans>

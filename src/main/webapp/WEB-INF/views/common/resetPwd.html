@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-cn" xmlns:th="http://www.thymeleaf.org" >
+<head>
+	<title>代理商密码修改</title>
+	<meta charset="UTF-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<!--<link rel="stylesheet" type="text/css" th:href="@{/assets/css/reg-login.css}" />-->
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+			font-size:14px;
+			color:#333;
+		}
+		.clearfix:after {
+			clear: both;
+			display: table;
+			content: " ";
+		}
+		.item{
+
+		}
+		.item .title{
+			line-height: 30px;
+			text-align: right;
+			float:left;
+			width: 80px;
+
+		}
+		.item .desc{
+			line-height: 30px;
+			float:left;
+			width:260px;
+			margin-left: 20px;
+		}
+		.forget-page{
+			position: fixed;
+			background-color: #e7e7e7;
+			width: 100%;
+			height: 100%;
+			top: 0;
+			left: 0;
+		}
+		.forget-page .line{
+			height: 5px;
+			background-color: #2ea967;
+		}
+		.forget-page .grid-forget{
+			width: 420px;
+			position: absolute;
+			left: 50%;
+			top: 50%;
+			margin-left: -210px;
+			-webkit-transform: translateY(-60%);
+			transform: translateY(-60%);
+		}
+		.forget-page .grid-forget h2 {
+			text-align: center;
+			font-weight: normal;
+			line-height: 65px;
+			font-size: 30px;
+		}
+		.forget-page .grid-forget input{
+			border: 0 none;
+			padding: 0 10px;
+			border:1px solid #DDD;
+			line-height: 30px;
+			display: block;
+			width:100%;
+		}
+
+		.forget-page .ctx{
+			padding: 50px 30px;
+			background-color: #FFF;
+		}
+
+		.forget-page .btn-super{
+			display: block;
+			width:100%;
+			text-align: center;
+			color:#FFF;
+			background-color: #2ea967;
+			text-decoration: none;
+			line-height: 36px;
+			margin-top:20px;
+		}
+		.forget-page .error{
+			color:RED;
+			line-height: 20px;
+			height:20px;
+			text-align: right;
+		}
+	</style>
+	<script th:src="@{/static/scripts/jquery.min.js}"></script>
+	<script th:src="@{/static/scripts/hex_ha_ha_ha_ha_ha.js}"></script>
+	<script th:src="@{/static/scripts/layer/layer.js}"></script>
+
+	<script type="text/javascript" th:inline="javascript">
+        var ctx = [[${ctx}]];
+
+		var flagPwd = false;
+		var flagConform = false;
+		var overdue = [[${overdue}]];
+		$(function(){
+			if(overdue == 'true'){
+				$(".btn").attr({"disabled":"disabled"});
+				layer.msg("链接已过期，请重新提交邮箱！", {icon: 0},function(){
+					window.location.href = ctx+"/forget";
+				}); 
+			}
+			
+			$("#password").blur(function(){
+				var val = $(this).val();
+				if(val.length < 8 || val.length > 16){
+					$('#error1').text("密码的长度必须是8-16位！");
+					flagPwd = false;
+					return;
+				}
+				if(/^\d+$/.test(val)){
+					$('#error1').text("密码不能是全数字！");
+					flagPwd = false;
+					return;
+				}
+				
+				if(/^[a-z]+$/i.test(val))  
+			    {  
+					$('#error1').text("密码不能是全字母！");
+					flagPwd = false;
+					return;
+			    }  
+				
+			 	if(!/^[A-Za-z0-9]+$/.test(val))  
+			    {  
+			 		$('#error1').text("密码只能包含数字和字母！");
+			 		flagPwd = false;
+			 		return;
+			    }  
+			 	
+			 	flagPwd = true;
+			 	$('#error1').text("");
+			 	
+			});
+			
+			$("#confirm").blur(function(){
+				var pwd = $('#password').val();
+				var conformPwd = $(this).val();
+				if(pwd != conformPwd){
+					$('#error2').text("两次密码不一致！");
+					flagConform = false;
+					return;
+				}
+				flagConform = true;
+				$('#error2').text("");
+			});	
+			
+			$("#commit").click(function(){
+				
+				if(flagPwd != true || flagConform != true ){
+					return;
+				}
+
+                var pwd = $('#password').val();
+                var conformPwd = $("#confirm").val();
+                if(pwd != conformPwd){
+                    $('#error2').text("两次密码不一致！");
+                    flagConform = false;
+                    return;
+                }
+				var email = $('#email').text();
+				var password = hex_ha_ha_ha_ha_ha($('#password').val());
+				
+				$.ajax({
+					type : "post",
+					url : ctx+"/api/password/reset",
+					data : {
+						email : email,
+						password : password
+					},
+					success : function(data) {
+                        data = $.parseJSON(data);
+                        if (data.code == 0){
+                            layer.msg(data.msg, {icon: 1});
+                            // Add by lpjLiu 2017-05-31 跳转至登录
+                            window.setTimeout(function(){
+                                location.href=ctx+"/login";
+                            }, 2000);
+                        }else {
+                            layer.msg(data.msg, {icon: 2});
+                            return;
+                        }
+					}
+				});
+			});
+		});
+	</script>
+</head>
+<body>
+<div class="forget-page">
+	<div class="line"></div>
+	<div class="grid-forget">
+		<h2>代理商密码修改</h2>
+		<div class="ctx">
+			<div class="clearfix item" style="margin-bottom:20px;">
+				<div class="title" >已注册邮箱</div>
+				<div class="desc" th:text="${email}" id="email"></div>
+			</div>
+			<div class="clearfix item">
+				<div class="title">密码</div>
+				<div class="desc"><input type="password" placeholder="请输入新密码" id="password"></div>
+			</div>
+			<p id="error1" class="error"></p>
+			<div class="clearfix item">
+				<div class="title">确认密码</div>
+				<div class="desc"><input type="password" placeholder="重新输入密码" id="confirm"></div>
+			</div>
+			<p id="error2" class="error"></p>
+			<a href="javascript:;" class="btn btn-super btn-green btn-bk" id="commit">提交</a>
+		</div>
+	</div>
+</div>
+</body>
+</html>

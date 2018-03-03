@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:tx="http://www.springframework.org/schema/tx" xmlns:mybatis="http://mybatis.org/schema/mybatis-spring"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd http://mybatis.org/schema/mybatis-spring http://mybatis.org/schema/mybatis-spring.xsd">
+
+	<!-- ucpaas_message_stats 主库 连接配置 START -->
+	<bean id="stats_master_dataSource" parent="dataSourceParent">
+		<property name="jdbcUrl" value="base-package${stats_master.jdbc.url}" />
+		<property name="username" value="${stats_master.jdbc.username}" />
+		<property name="password" value="${stats_master.jdbc.password}" />
+	</bean>
+
+	<!-- ucpaas_message_stats主库 配置mybitasSqlSessionFactoryBean -->
+	<bean id="stats_master_sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="stats_master_dataSource" />
+		<property name="configLocation" value="classpath:mybatis-config.xml" />
+		<property name="mapperLocations" value="classpath*:mapper/**/*Mapper.xml" />
+		<property name="plugins">
+			<ref bean="jsmsPageInterceptor" />
+		</property>
+	</bean>
+    
+    <bean id="stats_master_sqlSessionTemplate" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg name="sqlSessionFactory" ref="stats_master_sqlSessionFactory" />
+	</bean>
+	
+	<!-- ucpaas_message_stats主库 事务配置 -->
+	<bean id="stats_master_transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="stats_master_dataSource" />
+		<qualifier value="statsMaster"/>
+	</bean>
+
+	<!-- 使用annotation注解方式配置事务 -->
+	<tx:annotation-driven transaction-manager="stats_master_transactionManager" />
+	<mybatis:scan base-package="com.jsmsframework.stats.mapper"  template-ref="stats_master_sqlSessionTemplate"/>
+
+</beans>

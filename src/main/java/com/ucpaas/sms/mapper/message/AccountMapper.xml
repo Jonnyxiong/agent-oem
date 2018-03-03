@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ucpaas.sms.mapper.message.AccountMapper">
+
+
+    <!-- 根据月份查询客户开户数量 -->
+    <select id="queryAgentClientNum" resultType="Integer">
+		SELECT
+			count(*) as client_num
+		FROM
+			`t_sms_account` t
+		WHERE
+			t.agent_id = #{agent_id} and t.`status` != 6
+			<if test="thisMonth != null">
+				AND DATE_FORMAT(t.createtime,'%Y-%m') = #{thisMonth}
+			</if>
+	</select>
+
+    <!--查询六个月内的客户开户数量，根据每月分组 -->
+    <select id="querySixMonthsAgentClientNum" resultType="map">
+		SELECT
+			DATE_FORMAT(t.createtime,'%m') as month,
+			count(0) as client_num
+		FROM
+			`t_sms_account` t
+		WHERE
+			t.agent_id = #{agent_id} and t.`status` != 6
+			and t.createtime >= DATE_FORMAT(date_add(NOW(), interval -5 MONTH), '%Y-%m')
+		GROUP BY DATE_FORMAT(t.createtime,'%Y-%m')
+	</select>
+
+    <!-- -->
+    <select id="queryCustomerForBalanceLackCount" resultType="Integer">
+		select count(0) as totalCount from(
+			SELECT
+				0
+			FROM
+			(
+				SELECT
+					t1.client_id,
+					MAX(CASE t1.product_type WHEN 0 THEN CONCAT(t1.remain_number,'条')  ELSE '0条' END ) 'industry_remain_num',
+			        MAX(CASE t1.product_type WHEN 1 THEN CONCAT(t1.remain_number,'条') ELSE '0条' END ) 'marketing_remain_num',
+			        MAX(CASE t1.product_type WHEN 2 THEN CONCAT(TRUNCATE(t1.remain_amount,2),'元') ELSE '0元' END ) 'international_remain_num',
+			        MAX(CASE t1.product_type WHEN 3 THEN CONCAT(t1.remain_number,'条') ELSE '0条' END ) 'code_remain_num',
+			        MAX(CASE t1.product_type WHEN 4 THEN CONCAT(t1.remain_number,'条') ELSE '0条' END ) 'note_remain_num'
+				FROM
+				(
+					SELECT
+						a.clientid AS client_id,
+						a.`name` AS client_name,
+						ifnull(t.product_type,100) as product_type,
+						SUM(ifnull(t.remain_amount,0)) AS remain_amount,
+						SUM(ifnull(t.remain_number,0)) AS remain_number
+					FROM
+						t_sms_account a
+						LEFT JOIN t_sms_oem_client_pool t ON a.clientid = t.client_id
+					WHERE t.`status`=0 and
+						a.clientid IN (
+							SELECT
+								clientid
+							FROM
+								`t_sms_account` t
+							WHERE
+								t.agent_id = #{agent_id}
+						)
+					GROUP BY
+						a.clientid,
+						t.product_type
+				) t1
+				GROUP BY t1.client_id
+				HAVING (industry_remain_num &lt;= 500 OR marketing_remain_num &lt;= 500 OR code_remain_num &lt;= 500 OR note_remain_num &lt;= 500)
+			) t2
+			GROUP BY t2.client_id
+		) m
+	</select>
+
+    <!-- -->
+    <select id="queryCustomerForBalanceLack" resultType="map">
+		SELECT
+			t1.client_id,
+			t1.client_name,
+			MAX(CASE t1.product_type WHEN 0 THEN CONCAT(t1.remain_number,'条')  ELSE '0条' END ) 'industry_remain_num',
+			MAX(CASE t1.product_type WHEN 1 THEN CONCAT(t1.remain_number,'条') ELSE '0条' END ) 'marketing_remain_num',
+			MAX(CASE t1.product_type WHEN 2 THEN CONCAT(TRUNCATE(t1.remain_amount,2),'元') ELSE '0元' END ) 'international_remain_num',
+			MAX(CASE t1.product_type WHEN 3 THEN CONCAT(t1.remain_number,'条') ELSE '0条' END ) 'code_remain_num',
+			MAX(CASE t1.product_type WHEN 4 THEN CONCAT(t1.remain_number,'条') ELSE '0条' END ) 'note_remain_num'
+		FROM
+		(
+			SELECT
+				a.clientid AS client_id,
+				a.`name` AS client_name,
+				ifnull(t.product_type,100) as product_type,
+                SUM(ifnull(t.remain_amount,0)) AS remain_amount,
+				SUM(ifnull(t.remain_number,0)) AS remain_number
+			FROM
+				t_sms_account a
+				LEFT JOIN t_sms_oem_client_pool t ON a.clientid = t.client_id
+			WHERE t.`status`=0 and
+				a.clientid IN (
+					SELECT
+						clientid
+					FROM
+						`t_sms_account` t
+					WHERE
+						t.agent_id = #{agent_id}
+				)
+			GROUP BY
+				a.clientid,
+				t.product_type
+		) t1
+		GROUP BY t1.client_id
+		HAVING (industry_remain_num &lt;= 500 OR marketing_remain_num &lt;= 500 OR code_remain_num &lt;= 500 OR note_remain_num &lt;= 500)
+		${limit}
+	</select>
+
+    <select id="queryCustomerForBalanceByType" resultType="map">
+
+        SELECT
+        a.clientid AS client_id,
+        a.`name` AS client_name,
+        t.product_type as product_type,
+        CASE  product_type
+            when 0 then '行业'
+		    when 1 then '会员营销短信'
+		    when 3 then '验证码'
+		    when 4 then '通知'
+		    when 2 then '国际'
+		    else '-'
+		end as product_type_str,
+		case t.operator_code
+			when 0 then '全网'
+			when 1 then '移动'
+			when 2 then '联通'
+			when 3 then '电信'
+			when 4 then '国际'
+			else '-'
+		end as operator_code_str,
+		case t.area_code
+		when 0 then '全国'
+		when 1 then '国际'
+		else '-'
+		end as area_code_str,
+        case t.product_type
+		when 2 then CONCAT(t.remain_amount,'元')
+		else CONCAT(floor(t.remain_number),'条')
+		end as account_balance,
+        date_format(t.due_time,'%Y-%m-%d') as due_time,
+        ifnull(t.remain_number,0) AS remain_number,
+        ifnull(t.remain_amount,0) AS remain_amount
+        FROM
+        t_sms_account a
+        LEFT JOIN t_sms_oem_client_pool t ON a.clientid = t.client_id
+        WHERE t.`status`=0 and
+        a.clientid=#{clientid}
+        AND  t.product_type=#{product_type}
+
+
+    </select>
+
+    <select id="queryCustomerForBalanceByTypeCount" resultType="String">
+        select
+        CASE m.product_type
+        WHEN 2 THEN CONCAT(CONVERT(sum(account_balance),CHAR),'元')
+        ELSE CONCAT(CONVERT(FLOOR(sum(account_balance)),CHAR),'条')
+        END as sumbalance from(
+        SELECT
+        a.clientid AS client_id,
+        a.`name` AS client_name,
+        t.product_type as product_type,
+        CASE  product_type
+            when 0 then '行业'
+		    when 1 then '会员营销短信'
+		    when 3 then '验证码'
+		    when 4 then '通知'
+		    when 2 then '国际'
+		    else '-'
+		end as product_type_str,
+		case t.operator_code
+			when 0 then '全网'
+			when 1 then '移动'
+			when 2 then '联通'
+			when 3 then '电信'
+			when 4 then '国际'
+			else '-'
+		end as operator_code_str,
+		case t.area_code
+		when 0 then '全国'
+		when 1 then '国际'
+		else '-'
+		end as area_code_str,
+        case t.product_type
+		when 2 then t.remain_amount
+		else t.remain_number
+		end as account_balance,
+        date_format(due_time,'%Y-%m-%d') as due_time,
+        ifnull(t.remain_number,0) AS remain_number
+        FROM
+        t_sms_account a
+        LEFT JOIN t_sms_oem_client_pool t ON a.clientid = t.client_id
+        WHERE t.`status`=0 and
+        a.clientid=  #{clientid}
+        AND  t.product_type=#{product_type}
+
+        ) m
+    </select>
+
+
+
+    <select id="getTestCount" parameterType="String" resultType="int">
+        select count(0) as count from t_sms_account a
+        join t_sms_agent_info b on b.agent_id = a.agent_id
+        where b.agent_id = #{agentId} and a.agent_owned = 1
+    </select>
+
+    <select id="getRealName" resultType="String">
+        select realname from t_sms_account where clientid = #{clientId}
+    </select>
+
+    <!-- 3. 获取客户资质信息 -->
+    <select id="getCerInfo" resultType="OauthPic">
+        SELECT
+            p.id,
+            p.agent_id AS agentId,
+            p.client_id AS clientId,
+            p.id_nbr AS idNbr,
+            p.img_url AS imgUrl,
+            CASE p.id_type
+                WHEN 1 THEN '身份证'
+                WHEN 11 THEN '身份证正面'
+                WHEN 10 THEN '身份证背面'
+                WHEN 2 THEN '护照'
+                WHEN 3 THEN '组织机构证'
+                WHEN 4 THEN '税务登记证'
+                WHEN 5 THEN '营业执照'
+                WHEN 6 THEN '三证合一'
+                WHEN 7 THEN '四证合一'
+                WHEN 8 THEN '等级证书号'
+            END AS idType,
+            p.oauth_type AS oauthType,
+            p.status,
+            p.create_date AS createDate,
+            p.update_date AS updateDate,
+            a.oauth_status AS oauthStatus,
+            a.realname AS realName,
+            a.client_type AS clientType
+        FROM t_sms_account a
+        LEFT JOIN t_sms_oauth_pic p ON a.clientid = p.client_id AND p.oauth_type = 2
+        WHERE a.clientid = #{clientId}
+        ORDER BY p.update_date desc
+		LIMIT 1
+    </select>
+
+    <select id="getNotPassRemark" resultType="String">
+        SELECT
+          ol.remark
+        FROM
+          t_sms_oauth_audit_log ol
+        WHERE
+          id = (
+            SELECT
+              MAX(id)
+            FROM
+              t_sms_oauth_audit_log l
+            WHERE l.audit_type = 2
+              AND l.status = 0
+              AND l.client_id = #{clientId}
+        )
+    </select>
+
+    <select id="getAuditLogByAgentId" resultType="String">
+        SELECT
+          admin_id
+        FROM
+          t_sms_oauth_audit_log
+        WHERE
+            agent_id = #{agentId} and audit_type = 1 ORDER BY create_date desc limit 1
+    </select>
+
+
+    <insert id="addCerInfo">
+        INSERT INTO t_sms_oauth_pic (
+            agent_id,
+            client_id,
+            id_nbr,
+            img_url,
+            id_type,
+            create_date,
+            update_date,
+            oauth_type
+        )
+        VALUE
+        (
+            #{agentId},
+            #{clientId},
+            #{idNbr},
+            #{imgUrl},
+            #{idType},
+            NOW(),
+            #{updateDate},
+            #{oauthType}
+        )
+    </insert>
+
+    <insert id="updateCerInfo">
+        UPDATE
+          t_sms_oauth_pic p
+        <set>
+            <if test="idNbr != null and idNbr != ''">
+                p.id_nbr = #{idNbr},
+            </if>
+            <if test="imgUrl != null and imgUrl != ''">
+                p.img_url = #{imgUrl},
+            </if>
+            <if test="idType != null and idType != ''">
+                p.id_type = #{idType},
+            </if>
+            p.update_date = #{updateDate}
+        </set>
+        WHERE
+        p.client_id = #{clientId}
+    </insert>
+
+    <!-- 修改客户资质同时修改客户的更新信息(将客户资质认证状态更新至待认证) -->
+    <update id="updateAccWithCer">
+        UPDATE
+          t_sms_account
+        SET
+          client_type = #{clientType}, updatetime = #{updateDate}, realname = #{realName}, oauth_status = 2
+        WHERE
+        clientid = #{clientId}
+    </update>
+
+    <insert id="insertAuditLog">
+        INSERT INTO `t_sms_oauth_audit_log`
+        (
+            `agent_id`,
+            `client_id`,
+            `admin_id`,
+            `audit_type`,
+            `status`,
+            `create_date`,
+            `remark`
+            )
+        VALUES
+        (
+            #{agentId},
+            #{clientId},
+            #{adminId},
+            #{auditType},
+            #{status},
+            #{createDate},
+            #{remark}
+        )
+    </insert>
+
+    <update id="updateOauthDate">
+        UPDATE t_sms_account t
+        SET t.oauth_date = NOW()
+        WHERE clientid = #{clientId}
+    </update>
+    
+    
+    
+      <resultMap type="com.jsmsframework.user.entity.JsmsAccount" id="AccountList">  
+                <result property="clientid" column="clientid"/>  
+                <result property="name" column="name"/>  
+        </resultMap>  
+    
+    <select id="getSearchList" resultMap="AccountList">
+        SELECT
+          clientid,
+          name
+        FROM
+          t_sms_account 
+        WHERE
+          agent_id = #{agentId}
+    </select>
+    
+</mapper>
+

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:context="http://www.springframework.org/schema/context"
+	   xmlns:aop="http://www.springframework.org/schema/aop" xmlns:plugin="http://www.springframework.org/schema/plugin"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+        http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd http://www.springframework.org/schema/plugin http://www.springframework.org/schema/plugin/spring-plugin.xsd">
+	
+	<!-- Root Context: defines shared resources visible to all other web components -->
+	
+	<!-- 采用注释的方式配置bean -->
+	<context:annotation-config />
+	
+	<!-- 使用Annotation自动注册Bean，解决事物失效问题：在主容器中不扫描@Controller注解，在SpringMvc中只扫描@Controller注解。  -->
+	<context:component-scan base-package="com.ucpaas.sms"><!-- base-package 如果多个，用“,”分隔 -->
+		<context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+	</context:component-scan>
+
+	<context:component-scan base-package="com.jsmsframework"/>
+	<!-- 根据不同的运行环境加载配置文件 -->
+	<context:property-placeholder location="classpath:system.properties" />
+	
+	<aop:aspectj-autoproxy proxy-target-class="true"/>  
+	
+	<!-- 数据源配置, 使用 BoneCP 数据库连接池 -->
+	<bean id="dataSourceParent" class="com.zaxxer.hikari.HikariDataSource" abstract="true" destroy-method="close">
+	    <!-- 数据源驱动类可不写，Druid默认会自动根据URL识别DriverClass -->
+	    <property name="driverClassName" value="com.mysql.jdbc.Driver" />
+		
+		<!-- 连接只读数据库时配置为true， 保证安全 -->
+		<property name="readOnly" value="false" />
+		<!-- 等待连接池分配连接的最大时长（毫秒），超过这个时长还没可用的连接则发生SQLException， 缺省:30秒 -->
+		<property name="connectionTimeout" value="60000" />
+		<!-- 一个连接idle状态的最大时长（毫秒），超时则被释放（retired），缺省:10分钟 -->
+		<property name="idleTimeout" value="600000" />
+		<!-- 一个连接的生命时长（毫秒），超时而且没被使用则被释放（retired），缺省:30分钟，建议设置比数据库超时时长少30秒，参考mysql wait_timeout参数（show variables like '%timeout%';） -->
+		<property name="maxLifetime" value="1800000" />
+		<!-- 连接池中允许的最大连接数。缺省值：10；推荐的公式：((core_count * 2) + effective_spindle_count) -->
+		<property name="maximumPoolSize" value="15" />
+
+	</bean>
+	
+	<import resource="spring-db-message.xml"/>
+	<import resource="spring-db-access-master.xml"/>
+	<import resource="spring-db-access-slave.xml"/>
+	<import resource="spring-db-record-master.xml"/>
+	<import resource="spring-db-record-slave.xml"/>
+	<import resource="spring-db-stats-master.xml"/>
+	<import resource="spring-db-stats-slave.xml"/>
+	<bean id="jsmsAppRunningSubject" class="com.jsmsframework.monitor.service.JsmsAppRunningSubjectImpl">
+		<property name="dataSourceList">
+			<list>
+				<ref bean="dataBase_10" />
+				<ref bean="dataBase_20" />
+				<ref bean="dataBase_21" />
+				<ref bean="dataBase_30" />
+				<ref bean="dataBase_31" />
+				<ref bean="dataBase_40" />
+				<ref bean="dataBase_41" />
+			</list>
+		</property>
+	</bean>
+	<bean id="dataBase_10" class="com.jsmsframework.monitor.pojo.JsmsDataSource" >
+		<constructor-arg type="javax.sql.DataSource" ref="message_dataSource_1"/>
+		<constructor-arg name="desc" value="业务库"/>
+	</bean>
+	<bean id="dataBase_20" class="com.jsmsframework.monitor.pojo.JsmsDataSource" >
+		<constructor-arg type="javax.sql.DataSource" ref="access_master_dataSource"/>
+		<constructor-arg name="desc" value="Access流水库-主库"/>
+	</bean>
+	<bean id="dataBase_21" class="com.jsmsframework.monitor.pojo.JsmsDataSource" >
+		<constructor-arg type="javax.sql.DataSource" ref="access_slave_dataSource"/>
+		<constructor-arg name="desc" value="Access流水库-从库"/>
+	</bean>
+	<bean id="dataBase_30" class="com.jsmsframework.monitor.pojo.JsmsDataSource" >
+		<constructor-arg type="javax.sql.DataSource" ref="record_master_dataSource"/>
+		<constructor-arg name="desc" value="Record流水库-主库"/>
+	</bean>
+	<bean id="dataBase_31" class="com.jsmsframework.monitor.pojo.JsmsDataSource" >
+		<constructor-arg type="javax.sql.DataSource" ref="record_slave_dataSource"/>
+		<constructor-arg name="desc" value="Record流水库-主库"/>
+	</bean>
+	<bean id="dataBase_40" class="com.jsmsframework.monitor.pojo.JsmsDataSource" >
+		<constructor-arg type="javax.sql.DataSource" ref="stats_master_dataSource"/>
+		<constructor-arg name="desc" value="统计库-主库"/>
+	</bean>
+	<bean id="dataBase_41" class="com.jsmsframework.monitor.pojo.JsmsDataSource" >
+		<constructor-arg type="javax.sql.DataSource" ref="stats_slave_dataSource"/>
+		<constructor-arg name="desc" value="统计库-从库"/>
+	</bean>
+
+
+	<!-- 缓存参数
+	<bean class="com.ucpaas.sms.util.UcpaasParamUtils" /> -->
+	
+	<!-- 邮件配置 -->
+	<bean id="javaMailSender" class="org.springframework.mail.javamail.JavaMailSenderImpl">
+		<property name="host" value="smtp.exmail.qq.com" />
+		<property name="port" value="465" />
+		<property name="username" value="admin@ucpaas.com" />
+		<property name="password" value="Ucpaas.com@2014" />
+		<property name="javaMailProperties">
+			<props>
+				<prop key="mail.smtp.auth">true</prop>
+				<prop key="mail.smtp.timeout">25000</prop>
+				<prop key="mail.smtp.socketFactory.class">javax.net.ssl.SSLSocketFactory</prop>
+			</props>
+		</property>
+	</bean>
+</beans>

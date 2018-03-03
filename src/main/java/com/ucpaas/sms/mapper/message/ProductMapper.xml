@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 产品管理-产品列表 -->
+<mapper namespace="com.ucpaas.sms.mapper.message.ProductMapper">
+	
+	<sql id="queryCondition">
+		<where>
+			<if test="productInfo != null">
+				and (
+						pi.product_id like CONCAT('%',#{productInfo},'%' ) 
+						or pi.product_code like CONCAT('%',#{productInfo},'%' ) 
+						or pi.product_name like CONCAT('%',#{productInfo},'%' )
+					)
+			</if>
+			<!-- 以代理：上架和已下架 -->
+			<if test="agent_status != null and agent_status == 0 ">
+				and ap.id is not NULL and (pi.`status` = 1 or pi.`status` = 2)
+			</if>
+			<!-- 未代理：已上架 -->
+			<if test="agent_status != null and agent_status == 1 ">
+				and ap.id is NULL and pi.`status` = 1 
+			</if>
+			<!--默认已上架  -->
+			<if test="agent_status == null or agent_status == '' ">
+				and pi.`status` = 1
+			</if>
+			
+			<if test="start_time_day != null">
+				and pi.create_time >= STR_TO_DATE(#{start_time_day},'%Y-%m-%d %H:%i:%S')
+			</if>
+			<if test="end_time_day != null">
+				and pi.create_time <![CDATA[<= STR_TO_DATE(CONCAT(#{end_time_day},' 23:59:59'),'%Y-%m-%d %H:%i:%S') ]]>
+			</if>
+		</where>
+	</sql>
+
+	<select id="query" resultType="map">
+		SELECT
+			pi.product_id,
+			pi.product_name,
+			pi.product_code,
+			CASE pi.product_type
+				WHEN 0 THEN '行业'
+				WHEN 1 THEN '营销'
+				WHEN 2 THEN '国际'
+			END AS product_type,
+			CASE pi.product_type
+				WHEN 2 THEN CONCAT(ROUND(pi.quantity,2),"元")
+				ELSE CONCAT(floor(pi.quantity),"条")
+			END AS quantity,
+			CASE pi.active_period
+				WHEN 0 THEN '无限期'
+				ELSE CONCAT(pi.active_period,"天")
+			END AS active_period,
+			CASE pi.product_type
+				WHEN 2 THEN CONCAT(ROUND(pi.product_price,2),"")
+				ELSE CONCAT(ROUND(pi.product_price,2),"元")
+			END AS product_price,
+			CASE pi.product_type
+				WHEN 2 THEN CONCAT(ROUND(pi.product_cost,2),"")
+				ELSE CONCAT(ROUND(pi.product_cost,2),"元")
+			END AS product_cost,
+			pi.creator,
+			date_format(
+			pi.create_time,
+			'%Y-%m-%d'
+			) AS create_time,
+			pi.`status`,
+			CASE pi.`status`
+				WHEN 0 THEN '待上架'
+				WHEN 1 THEN '已上架'
+				WHEN 2 THEN '已下架'
+			END AS status_name,
+			ap.id,
+			ap.agent_id,
+			IF(ap.id is NULL,'未代理','已代理') as agent_status_name,
+			IF(ap.id is NULL,1,0) as agent_status
+		FROM
+			t_sms_product_info pi
+			LEFT JOIN t_sms_agent_product ap ON pi.product_id = ap.product_id and ap.agent_id = #{agent_id}
+		<include refid="queryCondition" />
+		ORDER BY pi.create_time desc
+		${limit}
+	</select>
+	
+	<select id="queryCount" resultType="map">
+		select count(0) as totalCount from(
+			SELECT
+				0
+			FROM
+				t_sms_product_info pi
+				LEFT JOIN t_sms_agent_product ap ON pi.product_id = ap.product_id and ap.agent_id = #{agent_id}
+			<include refid="queryCondition" />
+		) m
+	</select>
+
+  <select id="getMostNum" resultType="string">
+  	SELECT 
+  		MAX(substring(CONCAT(t.order_id,""),14)) as num
+  	FROM 
+  		t_sms_client_order t
+  	WHERE 1 = 1 
+  	AND t.order_id like CONCAT('${orderIdPre}','%' )
+  </select>
+
+	<select id="findOemProductInfo" resultType="com.jsmsframework.product.entity.JsmsOemProductInfo">
+		select
+			product_id as "productId",
+			product_type as "productType",
+			unit_price as "unitPrice"
+		from t_sms_oem_product_info where `status` = 1 and is_show = 1
+	</select>
+
+</mapper>

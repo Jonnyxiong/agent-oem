@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:tx="http://www.springframework.org/schema/tx" xmlns:mybatis="http://mybatis.org/schema/mybatis-spring"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd http://mybatis.org/schema/mybatis-spring http://mybatis.org/schema/mybatis-spring.xsd">
+
+	<!-- ucpaas_message_access 从库 连接配置 START -->
+	<bean id="access_slave_dataSource" parent="dataSourceParent">
+		<property name="jdbcUrl" value="${access_slave.jdbc.url}" />
+		<property name="username" value="${access_slave.jdbc.username}" />
+		<property name="password" value="${access_slave.jdbc.password}" />
+	</bean>
+
+	<!-- 配置mybitasSqlSessionFactoryBean -->
+	<bean id="access_slave_sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="access_slave_dataSource" />
+		<property name="configLocation" value="classpath:mybatis-config.xml" />
+		<property name="mapperLocations" value="classpath*:mapper/**/*Mapper.xml" />
+		<property name="plugins">
+			<ref bean="jsmsPageInterceptor" />
+		</property>
+	</bean>
+
+	<!-- 配置SqlSessionTemplate -->
+	<bean id="access_slave_sqlSessionTemplate" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg name="sqlSessionFactory" ref="access_slave_sqlSessionFactory" />
+	</bean>
+    
+	<!-- 事务配置 -->
+	<bean id="access_slave_transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="access_slave_dataSource" />
+		<qualifier value="accessSlave" />
+	</bean>
+
+	<!-- 使用annotation注解方式配置事务 -->
+	<tx:annotation-driven transaction-manager="access_slave_transactionManager" />
+	<!-- 扫描mapper-->
+	<!-- 因为在java使用mapper对象时，并不知道连的是那个库，所以mapper需根据库去分开包放-->
+	<!--<mybatis:scan base-package="com.ucpaas.sms.mapper.message,com.jsmsframework.common.mapper,com.jsmsframework.order.mapper, com.jsmsframework.finance.mapper,com.jsmsframework.user.mapper,com.jsmsframework.user.*.mapper,com.jsmsframework.product.mapper"  template-ref="access_slave_sqlSessionFactory"/>-->
+	<mybatis:scan base-package="com.jsmsframework.access.access.mapper"  template-ref="access_slave_sqlSessionTemplate"/>
+
+
+</beans>

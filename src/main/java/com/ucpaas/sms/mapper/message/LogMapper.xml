@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ucpaas.sms.mapper.message.LogMapper">
+	
+	<!-- 添加操作日志-->
+	<insert id="addLog">
+		INSERT INTO t_sms_oprate_log (
+			user_id,
+			page_id,
+			page_url,
+			op_type,
+			op_desc,
+			ip,
+			create_date
+		)
+		VALUES
+			(#{userId}, #{pageId}, #{pageUrl}, #{opType}, #{opDesc}, #{ip}, now())
+	</insert>
+
+</mapper>

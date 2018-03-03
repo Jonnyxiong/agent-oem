@@ -1,0 +1,756 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 产品管理-产品列表 -->
+<mapper namespace="sms">
+
+	<sql id="queryInterShortMessagePriceCondition">
+		<where>
+			<if test="condition!=null and condition !='' ">
+				and (
+				intername like CONCAT('%',#{condition},'%' )
+				or areaname like CONCAT('%',#{condition},'%' )
+				or prefix like CONCAT('%',#{condition},'%' )
+				)
+			 </if>
+		</where>
+	</sql>
+	
+	<select id="queryInterShortMessagePrice" resultType="map">
+	   SELECT 
+		   id, 
+		   prefix,
+		   areaname,
+		   intername,
+		   intercode,
+		   ROUND(TRUNCATE (fee / 1000000, 4),2) as fee
+	   FROM 
+	   		t_sms_client_tariff
+	   <include refid="queryInterShortMessagePriceCondition" />
+	   ${limit}
+	</select>
+	
+	<select id="queryInterShortMessagePriceCount" resultType="map">
+		SELECT count(0) as totalCount FROM(
+			SELECT 
+			   0
+		    FROM 
+		   		t_sms_client_tariff 
+		   <include refid="queryInterShortMessagePriceCondition" />
+		) m
+	</select>
+	
+	<sql id="querySmsPurchaseProductCondition">
+		<where>
+			status = 1 and is_show = 1
+			<![CDATA[
+				and due_time > NOW()
+			]]>
+		</where>
+	</sql>
+	<select id="querySmsPurchaseProduct" resultType="map">
+		SELECT
+			product_id,
+			product_code,
+			product_name,
+			product_desc,
+			operator_code,
+			product_type,
+			CASE product_type
+				when 0 then '验证码/通知短信'
+				when 1 then '会员营销短信'
+				else '国际短信'
+			END AS product_type_name,
+			area_code,
+			date_format(due_time,'%Y-%m-%d') as due_time,
+			unit_price,
+			status,
+			creator,
+			date_format(create_time,'%Y-%m-%d %H:%i:%S') as create_time,
+			updator,
+			update_time,
+			remark
+		FROM t_sms_oem_product_info
+		<include refid="querySmsPurchaseProductCondition" />
+		ORDER BY create_time DESC
+		${limit}
+	</select>
+	
+	<select id="querySmsPurchaseProductCount" resultType="map">
+		SELECT COUNT(0) AS totalCount FROM (
+			SELECT
+				0
+			FROM t_sms_oem_product_info
+			<include refid="querySmsPurchaseProductCondition" />
+		) m
+	
+	</select>
+	
+	<select id="queryOemProductInfo" resultType="map">
+		SELECT
+			product_id,
+			product_name,
+			product_type,
+			product_code,
+			unit_price,
+			date_format(due_time,'%Y-%m-%d %H:%i:%S') as due_time
+		FROM 
+			t_sms_oem_product_info
+		WHERE 
+			product_id = #{product_id}
+	</select>
+	
+	
+	<select id="queryDiscountRateForProduct" resultType="map">
+		SELECT 
+			hy_sms_discount,
+			yx_sms_discount,
+			gj_sms_discount
+		FROM 
+			t_sms_oem_data_config 
+		WHERE 
+			agent_id = #{agent_id}
+		LIMIT 1
+	</select>
+	
+	<select id="queryDiscountRateForOverall" resultType="map">
+		SELECT 
+			param_value
+		FROM 
+			t_sms_agent_client_param 
+		WHERE 
+			param_key = #{param_key}
+		LIMIT 1
+	</select>
+	
+	<select id="queryRebateBalance" resultType="map">
+		SELECT
+			rebate_income
+		FROM 
+			t_sms_agent_account 
+		WHERE 
+			agent_id = #{agent_id}
+	</select>
+	
+	<select id="queryAgentAccount" resultType="map">
+		SELECT 
+			balance,
+			credit_balance,
+			accumulated_consume,
+			accumulated_rebate_pay
+		FROM 
+			t_sms_agent_account 
+		WHERE 
+			agent_id = #{agent_id}
+	</select>
+	
+	<select id="queryOffsetRebateRate" resultType="map">
+		SELECT
+			rebate_use_radio
+		FROM
+			t_sms_agent_info 
+		WHERE
+			agent_id = #{agent_id}
+	</select>
+	
+	
+	<select id="getTheMostNumForMinute" resultType="string">
+	  	SELECT 
+	  		MAX(substring(CONCAT(t.order_id,""),14)) as num
+	  	FROM 
+	  		t_sms_oem_agent_order t
+	  	WHERE 1 = 1 
+	  	AND t.order_id like CONCAT('${orderIdPre}','%' )
+  	</select>
+
+	<!--Add by lpjLiu 2017-05-23 增加订单编号 -->
+	<insert id="createOrder">
+		INSERT INTO t_sms_oem_agent_order (
+			order_id,
+			order_no,
+			order_type,
+			product_id,
+			product_code,
+			product_type,
+			product_name,
+			unit_price,
+			order_number,
+			order_amount,
+			product_price,
+			agent_id,
+			client_id,
+			name,
+			agent_pool_id,
+			due_time,
+			operator_code,
+			area_code,
+			create_time,
+			remark
+			)
+		VALUES(
+			#{order_id},
+			#{order_no},
+			#{order_type},
+			#{product_id},
+			#{product_code},
+			#{product_type},
+			#{product_name},
+			#{unit_price},
+			#{order_number},
+			#{order_amount},
+			#{product_price},
+			#{agent_id},
+			#{client_id},
+			#{name},
+			#{agent_pool_id},
+			#{due_time},
+			#{operator_code},
+			#{area_code},
+			#{create_time},
+			#{remark}
+			)
+	</insert>
+
+	<update id="updateOemAgentOrder">
+		UPDATE t_sms_oem_agent_order SET agent_pool_id = #{agent_pool_id} WHERE order_id = #{order_id}
+	</update>
+
+	<!--Add by lpjLiu 2017-05-23 增加单价纬度进行查询 -->
+	<select id="queryOemAgentPool" resultType="map">
+		SELECT
+			agent_pool_id,
+			agent_id,
+			product_type,
+			due_time,
+			status,
+			remain_number,
+			unit_price,
+			remain_amount
+		FROM
+			t_sms_oem_agent_pool
+		WHERE
+			1 = 1 and status = 0
+		<if test="agent_id != null">
+			and agent_id = #{agent_id}
+		</if>
+		<if test="product_type != null">
+			and product_type = #{product_type}
+		</if>
+		<if test="due_time != null">
+			and due_time = #{due_time}
+		</if>
+		<if test="unit_price != null">
+			and unit_price = #{unit_price}
+		</if>
+	</select>
+
+	<!--Add by lpjLiu 2017-05-23 增加单价插入，并获取自增ID -->
+	<insert id="insertOemAgentPool" useGeneratedKeys="true" keyProperty="agent_pool_id" >
+		INSERT INTO t_sms_oem_agent_pool (
+			agent_id,
+			product_type,
+			due_time,
+			status,
+			remain_number,
+			<if test="unit_price != null" >
+				unit_price,
+			</if>
+			remain_amount,
+			update_time,
+			remark
+		)
+		VALUES(
+			#{agent_id},
+			#{product_type},
+			#{due_time},
+			#{status},
+			#{remain_number},
+			<if test="unit_price != null" >
+				#{unit_price},
+			</if>
+			#{remain_amount},
+			#{update_time},
+			#{remark}
+		)
+	</insert>
+	
+	<update id="updateOemAgentPool">
+		UPDATE t_sms_oem_agent_pool
+		<set>
+			<if test="remain_number != null">
+				remain_number = #{remain_number},
+			</if>
+			<if test="remain_amount != null">
+				remain_amount = #{remain_amount},
+			</if>
+			<if test="update_time != null">
+				update_time = #{update_time},
+			</if>
+		</set>
+		WHERE 
+			agent_pool_id = #{agent_pool_id}
+	</update>
+	
+	<insert id="insertAgentBalanceBill">
+		INSERT INTO t_sms_agent_balance_bill (
+			agent_id,
+			payment_type,
+			financial_type,
+			amount,
+			balance,
+			create_time,
+			order_id,
+			admin_id,
+			client_id,
+			remark
+		)
+		VALUES(
+			#{agent_id},
+			#{payment_type},
+			#{financial_type},
+			#{amount},
+			#{balance},
+			#{create_time},
+			#{order_id},
+			#{admin_id},
+			#{client_id},
+			#{remark}
+		)
+	</insert>
+	
+	
+	<insert id="insertAgentRebateBill">
+		INSERT INTO t_sms_agent_rebate_bill (
+			agent_id,
+			payment_type,
+			financial_type,
+			order_id,
+			amount,
+			balance,
+			create_time,
+			remark
+		)
+		VALUES(
+			#{agent_id},
+			#{payment_type},
+			#{financial_type},
+			#{order_id},
+			#{amount},
+			#{balance},
+			#{create_time},
+			#{remark}
+		)
+	</insert>
+	
+	<update id="updateAgentAccount">
+		UPDATE t_sms_agent_account
+		<set>
+			<if test="balance != null">
+				balance = balance - #{balance},
+			</if>
+			<if test="rebate_income != null">
+				rebate_income = rebate_income - #{rebate_income},
+			</if>
+			<if test="accumulated_consume != null">
+				accumulated_consume = accumulated_consume + #{accumulated_consume},
+			</if>
+			<if test="accumulated_rebate_pay != null">
+				accumulated_rebate_pay = accumulated_rebate_pay + #{accumulated_rebate_pay},
+			</if>
+		</set>
+		WHERE 
+			agent_id = #{agent_id}
+	</update>
+	
+	<select id="queryOemAgentAccountStatisticsCountForAgent" resultType="map">
+		SELECT
+			count(*) as num
+		FROM
+			t_sms_oem_agent_account_statistics 
+		WHERE
+			agent_id = #{agent_id}
+	</select>
+	
+	<insert id="insertOemAgentAccountStatistics">
+		INSERT INTO t_sms_oem_agent_account_statistics (
+			agent_id,
+			hy_total_purchase_number,
+			hy_remain_rebate_number,
+			yx_total_purchase_number,
+			yx_remain_rebate_number,
+			gj_total_purchase_amount,
+			gj_remain_rebate_amount
+		)
+		VALUES(
+			#{agent_id},
+			#{hy_total_purchase_number},
+			#{hy_remain_rebate_number},
+			#{yx_total_purchase_number},
+			#{yx_remain_rebate_number},
+			#{gj_total_purchase_amount},
+			#{gj_remain_rebate_amount}
+		)
+	</insert>
+	
+	<update id="addOemAgentAccountStatistics">
+		UPDATE t_sms_oem_agent_account_statistics
+		<set>
+			<if test="hy_total_purchase_number != null and orpeatre==0 ">
+				hy_total_purchase_number = #{hy_total_purchase_number} + hy_total_purchase_number
+			</if>
+			<if test="yx_total_purchase_number != null and orpeatre==0">
+				yx_total_purchase_number = #{yx_total_purchase_number} + yx_total_purchase_number
+			</if>
+			<if test="gj_total_purchase_amount != null and orpeatre==0">
+				gj_total_purchase_amount = #{gj_total_purchase_amount} + gj_total_purchase_amount
+			</if>
+			<if test="co_total_purchase_number != null and orpeatre==0">
+				yzm_total_purchase_number = #{co_total_purchase_number} + yzm_total_purchase_number
+			</if>
+			<if test="no_total_purchase_number != null and orpeatre==0">
+				tz_total_purchase_number = #{no_total_purchase_number} + tz_total_purchase_number
+			</if>
+			<if test="hy_remain_rebate_number != null and orpeatre==0">
+				hy_remain_rebate_number = #{hy_remain_rebate_number} + hy_remain_rebate_number
+			</if>
+			<if test="yx_remain_rebate_number != null and orpeatre==0">
+				yx_remain_rebate_number = #{yx_remain_rebate_number} + yx_remain_rebate_number
+			</if>
+			<if test="gj_remain_rebate_amount != null and orpeatre==0">
+				gj_remain_rebate_amount = #{gj_remain_rebate_amount} + gj_remain_rebate_amount
+			</if>
+			<if test="co_remain_rebate_number != null and orpeatre==0 ">
+				yzm_remain_rebate_number = #{co_remain_rebate_number} + yzm_remain_rebate_number
+			</if>
+			<if test="no_remain_rebate_number != null and orpeatre==0 ">
+				tz_remain_rebate_number = #{no_remain_rebate_number} + tz_remain_rebate_number
+			</if>
+	<!-- /*回退*/ -->
+    <if test="hy_total_purchase_number != null and orpeatre==1">
+        hy_total_purchase_number =   hy_total_purchase_number - #{hy_total_purchase_number}
+    </if>
+    <if test="yx_total_purchase_number != null and orpeatre==1">
+        yx_total_purchase_number =   yx_total_purchase_number - #{yx_total_purchase_number}
+    </if>
+    <if test="gj_total_purchase_amount != null and orpeatre==1">
+        gj_total_purchase_amount = gj_total_purchase_amount - #{gj_total_purchase_amount}
+    </if>
+    <if test="co_total_purchase_number != null and orpeatre==1">
+        yzm_total_purchase_number = yzm_total_purchase_number - #{co_total_purchase_number}
+    </if>
+    <if test="no_total_purchase_number != null and orpeatre==1">
+        tz_total_purchase_number =tz_total_purchase_number -  #{no_total_purchase_number}
+    </if>
+    <if test="hy_remain_rebate_number != null and orpeatre==1">
+        hy_remain_rebate_number =hy_remain_rebate_number - #{hy_remain_rebate_number}
+    </if>
+    <if test="yx_remain_rebate_number != null and orpeatre==1">
+        yx_remain_rebate_number = yx_remain_rebate_number - #{yx_remain_rebate_number}
+    </if>
+    <if test="gj_remain_rebate_amount != null and orpeatre==1">
+        gj_remain_rebate_amount =gj_remain_rebate_amount -  #{gj_remain_rebate_amount}
+    </if>
+    <if test="co_remain_rebate_number != null and orpeatre==1 ">
+        yzm_remain_rebate_number =yzm_remain_rebate_number - #{co_remain_rebate_number}
+    </if>
+    <if test="no_remain_rebate_number != null and orpeatre==1 ">
+        tz_remain_rebate_number =tz_remain_rebate_number - #{no_remain_rebate_number}
+    </if>
+</set>
+WHERE
+    agent_id = #{agent_id}
+</update>
+
+<!--  start give sms -->
+	<select id="getAgentIdByClientId" resultType="java.lang.String">
+		SELECT
+			agent_id
+		FROM
+			t_sms_account
+		WHERE
+			clientid = #{clientid}
+	</select>
+
+
+	<select id="getAgentTypeByAgentId" resultType="int">
+		SELECT
+			agent_type
+		FROM
+			t_sms_agent_info
+		WHERE
+			agent_id = #{agent_id}
+	</select>
+
+
+	<select id="getOemDataConfig" resultType="map">
+		SELECT
+			id,
+			test_product_id,
+			test_sms_number
+		FROM
+			t_sms_oem_data_config
+		WHERE
+			agent_id = #{agent_id}
+	</select>
+
+	<select id="getOemProductInfoByProductId" resultType="map">
+		SELECT
+			status,
+			unit_price,
+			product_type,
+			due_time,
+			product_id,
+			product_code,
+			product_name
+		FROM
+			t_sms_oem_product_info
+		WHERE
+			product_id = #{product_id}
+	</select>
+
+
+	<select id="getAgentAccountByAgentId" resultType="map">
+		SELECT
+			balance
+		FROM
+			t_sms_agent_account
+		WHERE
+			agent_id = #{agent_id}
+	</select>
+
+	<insert id="createAgentBalanceBill">
+		INSERT INTO `t_sms_agent_balance_bill` (
+			`id`,
+			`agent_id`,
+			`payment_type`,
+			`financial_type`,
+			`amount`,
+			`balance`,
+			`create_time`,
+			`order_id`,
+			`admin_id`,
+			`client_id`,
+			`remark`
+		)
+		VALUES
+			(
+				#{id},
+				#{agent_id},
+				#{payment_type},
+				#{financial_type},
+				#{amount},
+				#{balance},
+				#{create_time},
+				#{order_id},
+				#{admin_id},
+				#{client_id},
+				#{remark}
+			)
+	</insert>
+
+
+	<select id="getAgentPoolIdByCondition" resultType="map">
+		SELECT
+			agent_pool_id
+		FROM
+			t_sms_oem_agent_pool
+		WHERE
+			agent_id = #{agent_id}
+			AND product_type = #{product_type}
+			AND due_time = #{due_time}
+			AND unit_price = #{unit_price}
+			AND status = #{status}
+			AND operator_code = #{operator_code}
+			AND area_code = #{area_code}
+	</select>
+
+	<select id="getClientPoolIdByCondition" resultType="map">
+		SELECT
+			client_pool_id
+		FROM
+			t_sms_oem_client_pool
+		WHERE
+			client_id = #{client_id}
+		AND product_type = #{product_type}
+		AND due_time = #{due_time}
+		AND unit_price = #{unit_price}
+		AND operator_code = #{operator_code}
+		AND area_code = #{area_code}
+		AND status = #{status}
+	</select>
+
+	<update id="updateClientPoolByCondition">
+		UPDATE
+			t_sms_oem_client_pool
+		SET
+			total_number = total_number + #{test_num},
+			remain_number = remain_number + #{test_num},
+			remain_test_number = remain_test_number + #{test_num}
+		WHERE
+			client_pool_id = #{client_pool_id}
+
+	</update>
+
+
+	<insert id="createOemAgentPool" useGeneratedKeys="true" keyProperty="agent_pool_id">
+		INSERT INTO `t_sms_oem_agent_pool` (
+			`agent_pool_id`,
+			`agent_id`,
+			`product_type`,
+			`due_time`,
+			`status`,
+			`remain_number`,
+			`unit_price`,
+			`remain_amount`,
+			`update_time`,
+			`remark`
+		)
+		VALUES
+			(
+				#{agent_pool_id},
+				#{agent_id},
+				#{product_type},
+				#{due_time},
+				#{status},
+				#{remain_number},
+				#{unit_price},
+				#{remain_amount},
+				#{update_time},
+				#{remark}
+			);
+	</insert>
+
+	<insert id="createOemClientPool" useGeneratedKeys="true" keyProperty="client_pool_id">
+		INSERT INTO `t_sms_oem_client_pool` (
+			`client_pool_id`,
+			`client_id`,
+			`product_type`,
+			`due_time`,
+			`status`,
+			`total_number`,
+			`remain_number`,
+			`unit_price`,
+			`total_amount`,
+			`remain_amount`,
+			`remain_test_number`,
+			`update_time`,
+			`remark`
+		)
+		VALUES
+			(
+				#{client_pool_id},
+				#{client_id},
+				#{product_type},
+				#{due_time},
+				#{status},
+				#{total_number},
+				#{remain_number},
+				#{unit_price},
+				#{total_amount},
+				#{remain_amount},
+				#{remain_test_number},
+				#{update_time},
+				#{remark}
+			)
+	</insert>
+
+	<select id="getOemAgentOrderTheMostNumForMinute" resultType="string">
+		SELECT
+			MAX(substring(CONCAT(t.order_id,""),14)) as num
+		FROM
+			t_sms_oem_agent_order t
+		WHERE
+			1 = 1
+			AND
+			t.order_id like CONCAT('${orderIdPre}','%' )
+	</select>
+
+	<select id="getOemClientOrderTheMostNumForMinute" resultType="string">
+		SELECT
+	  		MAX(substring(CONCAT(t.order_id,""),14)) as num
+	  	FROM
+	  		t_sms_oem_client_order t
+	  	WHERE 1 = 1
+	  	AND t.order_id like CONCAT('${orderIdPre}','%' )
+	</select>
+
+	<insert id="insertOemAgentOrder">
+		INSERT INTO `t_sms_oem_agent_order` (
+			`order_id`,
+			`order_no`,
+			`order_type`,
+			`product_id`,
+			`product_code`,
+			`product_type`,
+			`product_name`,
+			`unit_price`,
+			`order_number`,
+			`order_amount`,
+			`product_price`,
+			`agent_id`,
+			`client_id`,
+			`name`,
+			`agent_pool_id`,
+			`due_time`,
+			`create_time`,
+			`remark`
+		)
+		VALUES
+			(
+				#{order_id},
+				#{order_no},
+				#{order_type},
+				#{product_id},
+				#{product_code},
+				#{product_type},
+				#{product_name},
+				#{unit_price},
+				#{order_number},
+				#{order_amount},
+				#{product_price},
+				#{agent_id},
+				#{client_id},
+				#{name},
+				#{agent_pool_id},
+				#{due_time},
+				#{create_time},
+				#{remark}
+			)
+	</insert>
+
+	<insert id="insertOemClientOrder">
+
+		INSERT INTO `t_sms_oem_client_order` (
+			`order_id`,
+			`order_no`,
+			`product_type`,
+			`order_type`,
+			`order_number`,
+			`unit_price`,
+			`order_price`,
+			`client_id`,
+			`agent_id`,
+			`client_pool_id`,
+			`due_time`,
+			`create_time`,
+			`remark`
+		)
+		VALUES
+			(
+				#{order_id},
+				#{order_no},
+				#{product_type},
+				#{order_type},
+				#{order_number},
+				#{unit_price},
+				#{order_price},
+				#{client_id},
+				#{agent_id},
+				#{client_pool_id},
+				#{due_time},
+				#{create_time},
+				#{remark}
+			);
+	</insert>
+</mapper> 

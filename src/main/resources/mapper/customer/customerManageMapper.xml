@@ -1,0 +1,1579 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 代理商平台 : 客户管理 -->
+<mapper namespace="customer">
+
+	<!-- 根据admin_id获取agentId和,认证状态 -->
+	<select id="getAgentId" resultType="map">
+		SELECT
+			i.agent_id,
+			i.oauth_status
+		FROM
+			t_sms_agent_info i
+		WHERE i.admin_id = #{admin_id}
+	</select>
+
+	<!-- 查询客户的手机号码和邮件是否在account表中已存在 -->
+	<select id="accountApplyCheckInAcc" resultType="map">
+		SELECT
+			IF(email = #{email},email,'') AS email,
+			IF(mobile = #{mobile},mobile,'') AS mobile
+		FROM
+			t_sms_account
+		WHERE
+			(email = #{email} OR mobile = #{mobile})
+		LIMIT 1
+	</select>
+
+	<!-- 用户管理:开户 -->
+	<insert id="saveAcc">
+		INSERT INTO t_sms_account (
+			id,clientid,PASSWORD,NAME,STATUS,agent_id,oauth_status,
+			client_level,mobile,email,province,city,area,address,
+			realname,client_type,needreport,needmo,needaudit,
+			createtime,ip,nodenum,paytype,needextend,
+			signextend,remarks,smsfrom,isoverratecharge,identify,extendtype,extendport,belong_sale,agent_owned)
+		VALUES(
+			#{id},#{clientid},#{password},#{name},#{status},#{agent_id},#{oauth_status},
+			#{client_level},#{mobile},#{email},#{province},#{city},#{area},#{address},
+			#{realname},#{client_type},#{needreport},#{needmo},#{needaudit},
+			NOW(),#{ip},#{nodenum},#{paytype},#{needextend},
+			#{signextend},#{remarks},#{smsfrom},#{isoverratecharge},#{identify},#{extendtype},#{extendport},#{belong_sale},#{agent_owned})
+	</insert>
+	
+	<!-- 用户管理:开户前的数据验证(邮箱、手机) -->
+	<select id="validateAcc" resultType="map">
+		SELECT COUNT(1) AS count
+		FROM t_sms_account a 
+		<where>
+			1=1 
+			<if test="email != null and email != ''">
+				AND a.email = #{email} 
+			</if>
+			<if test="mobile != null and mobiel != ''">
+				AND a.mobile = #{mobile}
+			</if>
+		</where>
+	</select>
+	
+	<!-- 获取单个客户的详细信息  -->
+	<select id="getDetailInfo" resultType="map">
+		SELECT  
+			a.id,
+			a.clientid,
+			a.name,
+			CASE a.status
+				WHEN 0 THEN '未激活'
+				WHEN 1 THEN '注册完成'
+				WHEN 5 THEN '已冻结'
+				WHEN 6 THEN '已注销'
+				WHEN 7 THEN '已锁定'
+				END AS status,
+			a.agent_id,
+			CASE 
+				WHEN a.oauth_status IS NULL THEN '待认证'
+				WHEN a.oauth_status = 2 THEN '待认证'
+				WHEN a.oauth_status = 3 THEN '已认证'
+				WHEN a.oauth_status = 4 THEN '未通过'
+				END AS oauth_status,
+			DATE_FORMAT(a.oauth_date,'%Y-%m-%d %T') AS oauth_date,
+			a.mobile,
+			a.email,
+			a.province,
+			a.city,
+			a.area,
+			a.address,
+			a.realname,
+			CASE
+				WHEN a.client_level IS NULL THEN ''
+				WHEN a.client_level = 1 THEN '普通客户'
+				WHEN a.client_level = 2 THEN '中小企业'
+				WHEN a.client_level = 3 THEN '大型企业'
+				END AS client_level,
+			a.client_type,
+			CASE a.needreport
+				WHEN 0 THEN '不获取'
+				WHEN 1 THEN '系统推送'
+				WHEN 2 THEN '系统推送'
+				WHEN 3 THEN '自己拉取'
+				END AS needreport,
+			CASE a.needmo
+				WHEN 0 THEN '不获取'
+				WHEN 1 THEN '系统推送'
+				WHEN 3 THEN '自己拉取'
+				END AS needmo,
+			CASE a.needaudit
+				WHEN 0 THEN '不需要'
+				WHEN 1 THEN '营销需要'
+				WHEN 2 THEN '全部需要'
+				WHEN 3 THEN '审核关键字'
+				END AS needaudit,
+			DATE_FORMAT(a.createtime,'%Y-%m-%d %T') AS createtime,
+			CASE
+				WHEN a.ip = '*' THEN ''
+				ELSE ip
+			END AS ip,
+			a.deliveryurl,
+			a.mourl,
+			a.nodenum,
+			CASE a.paytype
+				WHEN 0 THEN '预付费'
+				WHEN 1 THEN '后付费'
+				END AS paytype,		
+			CASE a.needextend
+				WHEN 0 THEN '不支持'
+				WHEN 1 THEN '支持'
+				END AS needextend,		
+			a.remarks
+		FROM
+			t_sms_account a
+		WHERE
+			a.clientid = #{clientid}
+	</select>
+	
+	<!-- 重置用户账户密码 -->
+	<update id="resetPsd">
+		UPDATE t_sms_account a SET
+			a.password = #{password}
+		WHERE
+			a.clientid = #{clientId}
+	</update>
+	
+	<sql id="queryCustomerInfoCondition">
+		<if test="customerInfo != null and customerInfo != '' ">
+			and (
+				a.clientid like CONCAT('%',#{customerInfo},'%' ) 
+				or a.name like CONCAT('%',#{customerInfo},'%' ) 
+				or a.mobile like CONCAT('%',#{customerInfo},'%' )
+			)
+		</if>
+		<if test="start_time_day != null">
+			and a.createtime >= STR_TO_DATE(#{start_time_day},'%Y-%m-%d %H:%i:%S')
+		</if>
+		<if test="end_time_day != null">
+			and a.createtime <![CDATA[<= STR_TO_DATE(#{end_time_day},'%Y-%m-%d %H:%i:%S') ]]>
+		</if>
+	</sql>
+
+
+
+	<select id="queryCustomerInfo" resultType="map">
+		SELECT
+		t1.client_id,
+		t1.client_name,
+		t1.mobile,
+		t1.status,
+		t1.agent_owned,
+		t1.client_type,
+		t1.email,
+		t1.createtime,
+		IF(t1.agent_owned = 1, md5(t1.password), "") as `password`,
+		CASE t1.status
+		WHEN 1 then '注册完成'
+		WHEN 5 then '冻结'
+		WHEN 6 then '注销'
+		ELSE '锁定'
+		END AS status_str,
+		t1.oauth_status,
+		CASE t1.oauth_status
+		WHEN 2 then '待认证'
+		WHEN 3 then '已认证'
+		ELSE '认证不通过'
+		END AS oauth_status_str,
+
+		t1.remarks,
+		<if test="isRechargeRollback!=null and isRechargeRollback==1">
+			case (IFNULL((MAX(CASE t1.product_type WHEN 3 THEN t1.remain_number ELSE 0 END )+MAX(CASE t1.product_type WHEN 0 THEN t1.remain_number ELSE 0 END )-
+			MAX(
+			CASE t2.alarm_type
+			WHEN 1 THEN
+			t2.alarm_number
+			END
+			)),1)&lt;=0)
+			WHEN 1 THEN 1
+			END  as yzm,
+			case (IFNULL((MAX(CASE t1.product_type WHEN 4 THEN t1.remain_number ELSE 0 END )+MAX(CASE t1.product_type WHEN 0 THEN t1.remain_number ELSE 0 END )-
+			MAX(
+			CASE t2.alarm_type
+			WHEN 2 THEN
+			t2.alarm_number
+			END)),1)&lt;=0)
+			WHEN 1 THEN 1
+			END  as  tz,
+			case (IFNULL((MAX(CASE t1.product_type WHEN 1 THEN t1.remain_number ELSE 0 END )-
+			MAX(
+			CASE t2.alarm_type
+			WHEN 3 THEN
+			t2.alarm_number
+			END)),1)&lt;=0)
+			WHEN 1 THEN 1
+			END  as  yx,
+			case (IFNULL((MAX(CASE t1.product_type WHEN 2 THEN t1.remain_amount ELSE 0 END )-
+			MAX(
+			CASE t2.alarm_type
+			WHEN 4 THEN
+			t2.alarm_amount
+			END)),1)&lt;=0)
+			WHEN 1 THEN 1
+			END  as  gj,
+		</if>
+		MAX(CASE t1.product_type WHEN 0 THEN t1.total_number ELSE 0 END ) hy_total_num,
+		MAX(CASE t1.product_type WHEN 0 THEN t1.remain_number ELSE 0 END ) hy_remain_num,
+		MAX(CASE t1.product_type WHEN 1 THEN t1.total_number ELSE 0 END ) yx_total_num,
+		MAX(CASE t1.product_type WHEN 1 THEN t1.remain_number ELSE 0 END ) yx_remain_num,
+		MAX(CASE t1.product_type WHEN 2 THEN t1.total_amount ELSE 0 END ) gj_total_num,
+		MAX(CASE t1.product_type WHEN 2 THEN t1.remain_amount ELSE 0 END ) gj_remain_num,
+		MAX(CASE t1.product_type WHEN 3 THEN t1.total_number ELSE 0 END ) co_total_num,
+		MAX(CASE t1.product_type WHEN 3 THEN t1.remain_number ELSE 0 END ) co_remain_num,
+		MAX(CASE t1.product_type WHEN 4 THEN t1.total_number ELSE 0 END ) no_total_num,
+		MAX(CASE t1.product_type WHEN 4 THEN t1.remain_number ELSE 0 END ) no_remain_num
+		FROM
+		(
+		SELECT
+		a.clientid AS client_id,
+		a.`name` AS client_name,
+		a.mobile AS mobile,
+		a.email AS email,
+		a.status AS status,
+		a.oauth_status AS oauth_status,
+		a.createtime AS createtime,
+		a.remarks AS remarks,
+		a.password AS password,
+		a.agent_owned AS agent_owned,
+		a.client_type as client_type,
+		ifnull(t.product_type,0) as product_type,
+		SUM(ifnull(t.total_number,0)) AS total_number,
+		SUM(ifnull(t.remain_number,0)) AS remain_number,
+		sum(ifnull(t.total_amount,0)) as total_amount,
+		sum(ifnull(t.remain_amount,0)) as remain_amount
+		FROM
+		t_sms_account a
+		left JOIN `t_sms_oem_client_pool` t
+		ON a.clientid = t.client_id and t.status = 0
+		WHERE
+		a.clientid in(
+		SELECT clientid FROM `t_sms_account` t WHERE t.agent_id = #{agent_id}
+		)
+		<include refid="queryCustomerInfoCondition" />
+		GROUP BY
+		a.clientid,
+		t.product_type
+		) t1 LEFT JOIN (SELECT
+		alarm_type,
+		alarm_number,
+		alarm_amount,
+		clientid
+		FROM t_sms_client_balance_alarm) t2 on t1.client_id = t2.clientid
+		GROUP BY t1.client_id
+		ORDER BY
+		<if test="isRechargeRollback!=null and isRechargeRollback==1">
+			yzm DESC,
+			tz DESC,
+			yx DESC,
+			gj DESC,
+		</if>
+		t1.createtime DESC
+		${limit}
+	</select>
+	
+	<select id="queryCustomerInfoCount" resultType="map">
+		SELECT count(0) AS totalCount from(
+			SELECT 
+				0
+			FROM 
+			(
+				SELECT
+					a.clientid AS client_id,
+					ifnull(t.product_type,0) as product_type
+				FROM
+					t_sms_account a
+					left JOIN `t_sms_oem_client_pool` t  
+					ON a.clientid = t.client_id
+				WHERE
+					a.clientid in(
+						SELECT clientid FROM `t_sms_account` t WHERE t.agent_id = #{agent_id}
+					)
+					<include refid="queryCustomerInfoCondition" />
+				GROUP BY
+					a.clientid,
+					t.product_type
+			) t1
+			GROUP BY t1.client_id
+		) m
+	</select>
+	
+	<sql id="queryCustomerConsumeReportCondition">
+		and stattype = 0
+		and agent_id = #{agent_id}
+		and paytype=#{paytype}
+		<if test="customerInfo != null and customerInfo != '' ">
+			and (
+				clientid like CONCAT('%',#{customerInfo},'%' ) 
+				or 
+				name like CONCAT('%',#{customerInfo},'%' ) 
+			)
+		</if>
+		<if test="smstype != null and smstype != '' ">
+			and smstype = #{smstype}
+		</if>
+		<if test="product_type != null and product_type != '' ">
+			and product_type = #{product_type}
+		</if>
+		<if test="start_time_day != null">
+			and date >= #{start_time_day}
+		</if>
+		<if test="end_time_day != null">
+			and date <![CDATA[<= #{end_time_day}]]>
+		</if>
+		
+	</sql>
+	<select id="queryCustomerConsumeReport" resultType="map">
+		SELECT
+			clientid,
+			`name`,
+		smstype,
+		case
+		 WHEN  smstype  is null then '-'
+		 WHEN  smstype = 0 then '通知'
+		 WHEN  smstype = 4 then '验证码'
+		 WHEN  smstype = 5 then '营销'
+		 WHEN  smstype = 6 then '告警'
+		 WHEN  smstype = 7 then 'USSD'
+		 WHEN  smstype = 8 then '闪信'
+		ELSE '-'
+		END  AS smstype_str,
+		product_type,
+		case
+		  WHEN product_type is null then '-'
+		  WHEN product_type = 0 then '行业'
+		  WHEN product_type = 1 then '营销'
+		  WHEN product_type = 2 then '国际'
+		  WHEN product_type = 99 then '其他'
+		ELSE '-'
+		end AS product_type_str,
+
+		  sum(usersmstotal) AS send_num,
+		  sum(chargetotal) AS chargeTotal,
+		  sum(reportsuccess) AS success_num,
+		  sum(submitsuccess) as not_known_num,
+		  sum(submitfail)+sum(reportfail) AS fail_num,
+		  sum(notsend) AS wait_send_num,
+		  sum(subretfail)+sum(auditfail)+sum(recvintercept)+sum(sendintercept)+sum(overrateintercept) AS intercept_num
+		FROM
+			`t_sms_access_channel_statistics`
+		WHERE
+			1 = 1
+			<include refid="queryCustomerConsumeReportCondition" />
+		GROUP BY clientid,smstype,product_type,paytype
+		ORDER BY chargeTotal DESC
+		${limit}
+	</select>
+
+	<select id="queryCustomerConsumeReport1" resultType="map">
+		SELECT
+		clientid,
+		`name`,
+		smstype,
+		case
+		WHEN  smstype  is null then '-'
+		WHEN  smstype = 0 then '通知'
+		WHEN  smstype = 4 then '验证码'
+		WHEN  smstype = 5 then '营销'
+		WHEN  smstype = 6 then '告警'
+		WHEN  smstype = 7 then 'USSD'
+		WHEN  smstype = 8 then '闪信'
+		ELSE '-'
+		END  AS smstype_str,
+		product_type,
+		case
+		WHEN product_type is null then '-'
+		WHEN product_type = 0 then '行业'
+		WHEN product_type = 1 then '营销'
+		WHEN product_type = 2 then '国际'
+		WHEN product_type = 99 then '其他'
+		ELSE '-'
+		end AS product_type_str,
+
+		sum(usersmstotal) AS send_num,
+		sum(chargetotal) AS chargeTotal,
+		sum(reportsuccess) AS success_num,
+		sum(submitsuccess) as not_known_num,
+		sum(submitfail)+sum(reportfail) AS fail_num,
+		sum(notsend) AS wait_send_num,
+		sum(subretfail)+sum(auditfail)+sum(recvintercept)+sum(sendintercept)+sum(overrateintercept) AS intercept_num
+		FROM
+		`t_sms_access_channel_statistics`
+		WHERE
+		1 = 1
+		<include refid="queryCustomerConsumeReportCondition" />
+		GROUP BY clientid,smstype,paytype
+		ORDER BY chargeTotal DESC
+		${limit}
+	</select>
+	<select id="total" resultType="map">
+		select  sum(t.send_num) as sendNum,
+		sum(t.chargeTotal) as charge_total,
+		sum(t.success_num) as successNum,
+		sum(t.not_known_num) as notKnownNum,
+		sum(t.fail_num) as failNum,
+		sum(t.wait_send_num) as waitSendNum,
+		sum(t.intercept_num) as interceptNum
+		from (
+		SELECT
+		sum(usersmstotal) AS send_num,
+		sum(chargetotal) AS chargeTotal,
+		sum(reportsuccess) AS success_num,
+		sum(submitsuccess) as not_known_num,
+		sum(submitfail)+sum(reportfail) AS fail_num,
+		sum(notsend) AS wait_send_num,
+		sum(subretfail)+sum(auditfail)+sum(recvintercept)+sum(sendintercept)+sum(overrateintercept) AS intercept_num
+		FROM
+		`t_sms_access_channel_statistics`
+		WHERE
+		1 = 1
+		<include refid="queryCustomerConsumeReportCondition" />
+		GROUP BY clientid,smstype,paytype
+		ORDER BY chargeTotal DESC) t
+	</select>
+
+
+	<select id="queryCustomerConsumeReportCount" resultType="map">
+		SELECT count(0) AS totalCount from(
+			SELECT
+				0
+			FROM
+				`t_sms_access_channel_statistics`
+			WHERE
+				1 = 1
+				<include refid="queryCustomerConsumeReportCondition" />
+			GROUP BY clientid,smstype,product_type,paytype
+		) m
+	</select>
+
+	<select id="queryCustomerConsumeReportCount1" resultType="map">
+		SELECT count(0) AS totalCount from(
+		SELECT
+		0
+		FROM
+		`t_sms_access_channel_statistics`
+		WHERE
+		1 = 1
+		<include refid="queryCustomerConsumeReportCondition" />
+		GROUP BY clientid,smstype,paytype
+		) m
+	</select>
+
+	<!-- 共计（小计） -->
+	<select id="queryCustomerConsumeReportTotal" resultType="map">
+		SELECT
+
+		SUM(usersmstotal) AS num_all_total,
+		SUM(chargetotal) AS chargeTotal_total,
+		SUM(reportsuccess) AS num_sucs_total,
+		SUM(submitsuccess) AS num_known_total,
+		SUM(submitfail+reportfail) AS num_fail_total,
+		SUM(notsend) AS num_pending_total,
+		SUM(IFNULL(subretfail,0)+IFNULL(auditfail,0)+IFNULL(recvintercept,0)+IFNULL(sendintercept,0)+IFNULL(overrateintercept,0)) AS num_intercept_total
+		FROM
+		t_sms_access_channel_statistics
+		WHERE
+		1 = 1
+		<include refid="queryCustomerConsumeReportCondition" />
+		GROUP BY agent_id
+	</select>
+
+
+
+
+
+	<sql id="querycustomerConsumeEveryReportCondition">
+		and stattype = 0
+		and agent_id = #{agent_id}
+		and paytype=#{paytype}
+		<if test="customerInfo != null and customerInfo != '' ">
+			and (
+				clientid like CONCAT('%',#{customerInfo},'%' ) 
+				or 
+				name like CONCAT('%',#{customerInfo},'%' ) 
+			)
+		</if>
+		<if test="smstype != null and smstype != '' ">
+			and smstype = #{smstype}
+		</if>
+		<!--<if test="product_type != null and product_type != '' ">
+			and product_type = #{product_type}
+		</if>-->
+		<if test="start_time_day != null">
+			and date >= #{start_time_day}
+		</if>
+		<if test="end_time_day != null">
+			and date <![CDATA[<= #{end_time_day} ]]>
+		</if>
+	</sql>
+	
+	<select id="querycustomerConsumeEveryReport" resultType="map">
+		SELECT
+			 date,
+			 clientid,
+			`name`,
+		smstype,
+			case
+				WHEN  smstype  is null then '-'
+				WHEN  smstype = 0 then '通知'
+				WHEN  smstype = 4 then '验证码'
+				WHEN  smstype = 5 then '营销'
+				WHEN  smstype = 6 then '告警'
+				WHEN  smstype = 7 then 'USSD'
+				WHEN  smstype = 8 then '闪信'
+				ELSE '-'
+			END  AS smstype_str,
+		product_type,
+			case
+				WHEN product_type is null then '-'
+				WHEN product_type = 0 then '行业'
+				WHEN product_type = 1 then '营销'
+				WHEN product_type = 2 then '国际'
+				WHEN product_type = 99 then '其他'
+				ELSE '-'
+			end AS product_type_str,
+
+			 sum(usersmstotal) AS send_num,
+			 sum(chargetotal) AS chargeTotal,
+		     sum(reportsuccess) AS success_num,
+		     sum(submitsuccess) AS not_known_num,
+		     sum(submitfail)+sum(reportfail) AS fail_num,
+		     sum(notsend) as wait_send_num,
+			 sum(subretfail)+sum(auditfail)+sum(recvintercept)+sum(sendintercept)+sum(overrateintercept) AS intercept_num
+
+		FROM
+			`t_sms_access_channel_statistics`
+		WHERE
+			1 = 1
+			<include refid="querycustomerConsumeEveryReportCondition" />
+		GROUP BY clientid,date,smstype,product_type,paytype
+		ORDER BY date DESC
+		${limit}
+	</select>
+
+
+
+	<select id="querycustomerConsumeEveryReport1" resultType="map">
+		SELECT
+		date,
+		clientid,
+		`name`,
+		smstype,
+		case
+		WHEN  smstype  is null then '-'
+		WHEN  smstype = 0 then '通知'
+		WHEN  smstype = 4 then '验证码'
+		WHEN  smstype = 5 then '营销'
+		WHEN  smstype = 6 then '告警'
+		WHEN  smstype = 7 then 'USSD'
+		WHEN  smstype = 8 then '闪信'
+		ELSE '-'
+		END  AS smstype_str,
+		product_type,
+		case
+		WHEN product_type is null then '-'
+		WHEN product_type = 0 then '行业'
+		WHEN product_type = 1 then '营销'
+		WHEN product_type = 2 then '国际'
+		WHEN product_type = 99 then '其他'
+		ELSE '-'
+		end AS product_type_str,
+
+		sum(usersmstotal) AS send_num,
+		sum(chargetotal) AS chargeTotal,
+		sum(reportsuccess) AS success_num,
+		sum(submitsuccess) AS not_known_num,
+		sum(submitfail)+sum(reportfail) AS fail_num,
+		sum(notsend) as wait_send_num,
+		sum(subretfail)+sum(auditfail)+sum(recvintercept)+sum(sendintercept)+sum(overrateintercept) AS intercept_num
+
+		FROM
+		`t_sms_access_channel_statistics`
+		WHERE
+		1 = 1
+		<include refid="querycustomerConsumeEveryReportCondition" />
+		GROUP BY clientid,date,smstype,paytype
+		ORDER BY date DESC
+		${limit}
+	</select>
+	
+	<select id="querycustomerConsumeEveryReportCount" resultType="map">
+		SELECT count(0) AS totalCount from(
+			SELECT
+				 0
+			FROM
+				`t_sms_access_channel_statistics`
+			WHERE
+				1 = 1
+				<include refid="querycustomerConsumeEveryReportCondition" />
+			GROUP BY clientid,date,smstype,product_type,paytype
+		) m
+	</select>
+
+
+	<!-- 共计（小计） -->
+	<select id="querycustomerConsumeEveryReportTotal" resultType="map">
+		SELECT
+		date,
+		SUM(usersmstotal) AS num_all_total,
+		SUM(chargetotal) AS chargeTotal_total,
+		SUM(reportsuccess) AS num_sucs_total,
+		SUM(submitsuccess) AS num_known_total,
+		SUM(submitfail+reportfail) AS num_fail_total,
+		SUM(notsend) AS num_pending_total,
+		SUM(IFNULL(subretfail,0)+IFNULL(auditfail,0)+IFNULL(recvintercept,0)+IFNULL(sendintercept,0)+IFNULL(overrateintercept,0)) AS num_intercept_total
+		FROM
+		t_sms_access_channel_statistics
+		WHERE
+		1 = 1
+		<include refid="querycustomerConsumeEveryReportCondition" />
+		GROUP BY clientid
+	</select>
+
+
+
+	<select id="querycustomerConsumeEveryReportCount1" resultType="map">
+		SELECT count(0) AS totalCount from(
+		SELECT
+		0
+		FROM
+		`t_sms_access_channel_statistics`
+		WHERE
+		1 = 1
+		<include refid="querycustomerConsumeEveryReportCondition" />
+		GROUP BY clientid,date ,smstype,paytype
+		) m
+	</select>
+	
+	
+	
+	<select id="queryCustomerInfoForAll" resultType="map">
+		SELECT 
+			t1.client_id,
+			t1.client_name,
+			t1.mobile,
+			t1.status,
+		    t1.agent_owned,
+		    t1.email,
+			CASE t1.status
+				WHEN 1 then '注册完成'
+				WHEN 5 then '冻结'
+				WHEN 6 then '注销'
+				ELSE '锁定'
+			END AS status_str,
+			t1.oauth_status,
+			CASE t1.oauth_status
+				WHEN 2 then '待认证'
+				WHEN 3 then '证件已认证'
+				ELSE '认证不通过'
+			END AS oauth_status_str,
+			date_format(t1.createtime,'%Y-%m-%d %H:%i:%S') as createtime,
+			t1.remarks,
+		CONCAT(
+		'剩余：',
+		MAX(CASE t1.product_type WHEN 0 THEN t1.remain_number ELSE 0 END )
+		) as hy_string,
+		CONCAT(
+		'剩余：',
+		MAX(CASE t1.product_type WHEN 1 THEN t1.remain_number ELSE 0 END )
+		) as yx_string,
+		CONCAT(
+		'剩余：',
+		MAX(CASE t1.product_type WHEN 2 THEN t1.remain_amount ELSE 0 END )
+		) as gj_string,
+		CONCAT(
+		'剩余：',
+		MAX(CASE t1.product_type WHEN 3 THEN t1.remain_number ELSE 0 END )
+		) as co_string,
+		CONCAT(
+		'剩余：',
+		MAX(CASE t1.product_type WHEN 4 THEN t1.remain_number ELSE 0 END )
+		) as no_string
+		FROM 
+		(
+			SELECT
+				a.clientid AS client_id,
+				a.`name` AS client_name,
+				a.mobile AS mobile,
+		        a.email AS email,
+				a.status AS status,
+				a.oauth_status AS oauth_status,
+				a.createtime AS createtime,
+				a.remarks AS remarks,
+		        a.agent_owned as agent_owned,
+				ifnull(t.product_type,0) as product_type,
+				SUM(ifnull(t.total_number,0)) AS total_number,
+				SUM(ifnull(t.remain_number,0)) AS remain_number,
+				sum(ifnull(t.total_amount,0)) as total_amount,
+				sum(ifnull(t.remain_amount,0)) as remain_amount
+			FROM
+				t_sms_account a
+				left JOIN `t_sms_oem_client_pool` t  
+				ON a.clientid = t.client_id
+				AND t. STATUS = 0
+			WHERE
+				a.clientid in(
+					SELECT clientid FROM `t_sms_account` t WHERE t.agent_id = #{agent_id}
+				)
+				<include refid="queryCustomerInfoCondition" />
+			GROUP BY
+				a.clientid,
+				t.product_type
+		) t1
+		GROUP BY t1.client_id
+		ORDER BY t1.createtime DESC
+	</select>
+	
+	
+	<!-- 修改当前客户状态 -->
+	<update id="editStatus">
+		UPDATE 
+			t_sms_account a 
+		SET 
+			a.status = #{status}
+		WHERE
+			a.clientid = #{clientid}
+	</update>
+	
+	<!-- 修改当前客户备注 -->
+	<update id="editCustomerRemark">
+		UPDATE 
+			t_sms_account a 
+		SET 
+			a.remarks = #{remarks}
+		WHERE
+			a.clientid = #{clientid}
+	</update>
+	
+	<select id="queryCommonSmsInfo" resultType="map">
+		SELECT
+			t.product_type,
+			t.due_time,
+			DATE_FORMAT(t.due_time, '%Y-%m-%d %H:%i:%S') as due_time_key,
+			DATE_FORMAT(t.due_time, '%Y%m%d') as due_time_key1,
+			DATE_FORMAT(t.due_time, '%H%i%S') as due_time_key2,
+			DATE_FORMAT(t.due_time, '%Y%m%d') as due_time_str,
+			SUM(t.remain_number) as remain_number
+		FROM
+			`t_sms_oem_agent_pool` t
+		WHERE
+			t.product_type = #{product_type}
+			and
+			t.agent_id = #{agent_id}
+			<![CDATA[
+				and t.due_time > NOW()
+			]]>
+		GROUP BY t.product_type,t.due_time
+		order by t.due_time
+	</select>
+
+	<select id="queryCommonSmsInfoForClient" resultType="map">
+		SELECT
+			e.client_pool_id,
+			e.product_type,
+			e.due_time,
+			e.product_type_str,
+			e.operator_code,
+			e.operator_code_str,
+			e.area_code,
+			e.area_code_str,
+			e.unit_price,
+			e.sms_unitprice,
+		    SUM(e.account_balance) AS account_balance,
+			e.remain_amount,
+			e.due_time1,
+			e.due_time,
+			SUM(e.remain_number) as remain_number
+		FROM(
+			SELECT
+				t.client_pool_id,
+				t.product_type,
+				case t.product_type
+				when 0 then '行业'
+				when 1 then '会员营销短信'
+				when 3 then '验证码'
+				when 4 then '通知'
+				when 2 then '国际'
+				else '-'
+				end as product_type_str,
+				t.operator_code,
+				case t.operator_code
+				when 0 then '全网'
+				when 1 then '移动'
+				when 2 then '联通'
+				when 3 then '电信'
+				when 4 then '国际'
+				else '-'
+				end as operator_code_str,
+				t.area_code,
+				case t.area_code
+				when 0 then '全国'
+				when 1 then '国际'
+				else '-'
+				end as area_code_str,
+				t.unit_price,
+				case t.product_type
+				when 2 then '-'
+				else CONCAT(t.unit_price,'元/条')
+				end as sms_unitprice,
+				case t.product_type
+				when 2 then CONCAT(t.remain_amount,'元')
+				else CONCAT( t.remain_number -
+				IF(t.remain_test_number <![CDATA[ < ]]> 0,
+				0,
+				t.remain_test_number
+				),'条')
+				end as account_balance,
+				IFNULL(t.remain_amount,0) as remain_amount,
+				date_format(t.due_time,'%Y%m%d%H%i%S')  as due_time1,
+				date_format(t.due_time,'%Y/%m/%d') as due_time,
+				t.remain_number - IF(t.remain_test_number <![CDATA[ < ]]> 0, 0, t.remain_test_number) as remain_number
+			FROM `t_sms_oem_client_pool` t
+			WHERE   status = 0 AND  t.product_type !=2
+				and t.client_id = #{client_id}
+				<![CDATA[
+					and t.due_time > NOW()
+				]]>
+		) e
+		WHERE  1=1 and ((e.remain_number!=0 and e.remain_amount=0 )or(e.remain_amount!=0 and e.remain_number=0))
+		<if test="product_type != null and product_type !=''">
+			and e.product_type = #{product_type}
+		</if>
+		<if test="operator_code != null and operator_code!='' ">
+		and e.operator_code = #{operator_code}
+		</if>
+		GROUP BY e.product_type,e.due_time,e.operator_code,e.area_code,e.unit_price
+		order by e.due_time,e.client_pool_id
+	</select>
+	
+	<select id="queryInterSmsInfo" resultType="map">
+		SELECT
+			t.product_type,
+			t.due_time,
+			DATE_FORMAT(t.due_time, '%Y-%m-%d %H:%i:%S') as due_time_key,
+			DATE_FORMAT(t.due_time, '%Y%m%d') as due_time_key1,
+			DATE_FORMAT(t.due_time, '%H%i%S') as due_time_key2,
+			DATE_FORMAT(t.due_time, '%Y%m%d') as due_time_str,
+			SUM(t.remain_amount) as remain_amount
+		FROM
+			`t_sms_oem_agent_pool` t
+		WHERE
+			t.product_type = #{product_type}
+			and
+			t.agent_id = #{agent_id}
+			<![CDATA[
+				and t.due_time > NOW()
+			]]>
+		GROUP BY t.product_type,t.due_time
+		order by t.due_time
+	</select>
+
+
+	<select id="querySmsInfo" resultType="map">
+		SELECT
+		t.product_type,
+		case t.product_type
+		when 0 then '行业'
+		when 1 then '会员营销短信'
+		when 3 then '验证码'
+		when 4 then '通知'
+		when 2 then '国际'
+		else '-'
+		end as product_type_str,
+		t.operator_code,
+		case t.operator_code
+		when 0 then '全网'
+		when 1 then '移动'
+		when 2 then '联通'
+		when 3 then '电信'
+		when 4 then '国际'
+		else '-'
+		end as operator_code_str,
+		t.area_code,
+		case t.area_code
+		when 0 then '全国'
+		when 1 then '国际'
+		else '-'
+		end as area_code_str,
+		t.unit_price,
+		case t.product_type
+		when 2 then '-'
+		else CONCAT(t.unit_price,'元/条')
+		end as sms_unitprice,
+		case t.product_type
+		when 2 then CONCAT(CONVERT(SUM(t.remain_amount),CHAR),'元')
+		else CONCAT(CONVERT(SUM(t.remain_number),CHAR),'条')
+		end as account_balance,
+		t.remain_number,
+		t.remain_amount,
+		date_format(t.due_time,'%Y%m%d%H%i%S') as due_time1,
+		date_format(t.due_time,'%Y/%m/%d') as due_time
+		FROM
+		`t_sms_oem_agent_pool` t
+		WHERE
+		status = 0
+		and
+		t.agent_id = #{agent_id}
+		AND ((t.remain_number != 0 AND IFNULL(t.remain_amount,0) = 0)
+		OR (t.remain_amount != 0 AND IFNULL(t.remain_number,0) = 0))
+		<![CDATA[
+				and t.due_time > NOW()
+			]]>
+		<include refid="queryCustomerForBalanceDetailsCondition"/>
+		group by t.product_type,t.area_code,t.operator_code,t.unit_price,t.due_time
+	</select>
+
+	<sql id="queryCustomerForBalanceDetailsCondition">
+
+		<if test="product_type != null and product_type !=''">
+			and t.product_type = #{product_type}
+		</if>
+		<if test="operator_code != null and operator_code!=''">
+			and t.operator_code = #{operator_code}
+		</if>
+	</sql>
+
+
+	
+	<select id="queryInterSmsInfoForClient" resultType="map">
+		SELECT
+			t.product_type,
+			t.due_time,
+			DATE_FORMAT(t.due_time, '%Y-%m-%d %H:%i:%S') as due_time_key,
+			DATE_FORMAT(t.due_time, '%Y%m%d') as due_time_key1,
+			DATE_FORMAT(t.due_time, '%H%i%S') as due_time_key2,
+			DATE_FORMAT(t.due_time, '%Y%m%d') as due_time_str,
+			SUM(t.remain_amount) as remain_amount
+		FROM
+			`t_sms_oem_client_pool` t
+		WHERE
+			t.product_type = #{product_type}
+			and
+			t.client_id = #{client_id}
+		GROUP BY t.product_type,t.due_time
+		order by t.due_time
+	</select>
+
+	<!--Mod by lpjLiu 2017-05-23 查询的时候可能存在多条，需要SUM进行求和-->
+	<select id="queryAgentPoolRemainNum" resultType="map">
+		SELECT 
+			SUM(remain_number) as remain_number,
+			remain_amount
+		FROM 
+			t_sms_oem_agent_pool 
+		WHERE 
+			agent_id = #{agent_id} 
+		AND product_type = #{product_type}
+		AND operator_code = #{operator_code}
+		AND area_code = #{area_code}
+		AND unit_price=#{unit_price}
+		AND DATE_FORMAT(due_time,'%Y%m%d%H%i%S') = #{due_time}
+	</select>
+
+	<!--Mod by lpjLiu 2017-05-23 给客户充值，查询代理商短信池，按单价由高到低 -->
+	<select id="queryAgentPoolRemainNumOrderByUnitPrice" resultType="map">
+		SELECT
+			agent_pool_id,
+			remain_number,
+			remain_amount,
+			unit_price,
+			due_time
+		FROM
+			t_sms_oem_agent_pool
+		WHERE
+		agent_id = #{agent_id}
+		AND product_type = #{product_type}
+		AND DATE_FORMAT(due_time,'%Y%m%d%H%i%S') = #{due_time}
+		ORDER BY unit_price desc
+	</select>
+
+	<!--Mod by lpjLiu 2017-05-23 查询的时候可能存在多条，需要SUM进行求和-->
+	<select id="queryClientPoolRemainNum" resultType="map">
+		SELECT
+			SUM(e.remain_number) as remain_number,
+			e.remain_amount
+		FROM(
+			SELECT
+				remain_number - IF(remain_test_number <![CDATA[ < ]]> 0, 0, remain_test_number) as remain_number,
+				remain_amount
+			FROM
+				t_sms_oem_client_pool
+			WHERE
+				client_id = #{client_id}
+				AND product_type = #{product_type}
+				AND operator_code = #{operator_code}
+				AND area_code = #{area_code}
+				AND DATE_FORMAT(due_time,'%Y%m%d%H%i%S') = #{due_time}
+		) e
+	</select>
+
+	<!--Mod by lpjLiu 2017-05-23 给客户回退，查询客户短信池，按单价由低到高 -->
+	<select id="queryClientPoolRemainNumOrderByUnitPrice" resultType="map">
+		SELECT
+			client_pool_id,
+			total_number,
+			remain_number - IF(remain_test_number <![CDATA[ < ]]> 0, 0, remain_test_number) as remain_number,
+			total_amount,
+			remain_amount,
+			unit_price,
+			due_time
+		FROM
+			t_sms_oem_client_pool
+		WHERE
+			client_id = #{client_id}
+			AND product_type = #{product_type}
+			AND operator_code = #{operator_code}
+			AND area_code = #{area_code}
+			AND DATE_FORMAT(due_time,'%Y%m%d%H%i%S') = #{due_time}
+		ORDER BY unit_price
+	</select>
+	
+	<insert id="createClientOrder">
+		INSERT INTO t_sms_oem_client_order (
+			order_id,
+			order_no,
+			product_type,
+			order_type,
+			order_number,
+			<if test="unit_price != null" >
+				unit_price,
+			</if>
+			order_price,
+			client_id,
+			agent_id,
+			client_pool_id,
+			due_time,
+			create_time,
+			operator_code,
+			area_code,
+			remark
+			)
+		VALUES(
+			#{order_id},
+			#{order_no},
+			#{product_type},
+			#{order_type},
+			#{order_number},
+			<if test="unit_price != null" >
+				#{unit_price},
+			</if>
+			#{order_price},
+			#{client_id},
+			#{agent_id},
+			#{client_pool_id},
+			#{due_time},
+			#{create_time},
+			#{operator_code},
+			#{area_code},
+			#{remark}
+			)
+	</insert>
+	
+	<select id="getClientTheMostNumForMinute" resultType="string">
+	  	SELECT 
+	  		MAX(substring(CONCAT(t.order_id,""),14)) as num
+	  	FROM 
+	  		t_sms_oem_client_order t
+	  	WHERE 1 = 1 
+	  	AND t.order_id like CONCAT('${orderIdPre}','%' )
+  	</select>
+
+	<!--Mod by lpjLiu 2017-05-23 增加单价查询条件-->
+  	<update id="reduceAgentPoolRemainNum">
+		UPDATE 
+			t_sms_oem_agent_pool
+		<set>
+			<if test="remain_number != null">
+				remain_number = remain_number - #{remain_number},
+			</if>
+			<if test="remain_amount != null">
+				remain_amount = remain_amount - #{remain_amount},
+			</if>
+		</set>
+		<where>
+			agent_id = #{agent_id}
+			AND product_type = #{product_type}
+			AND operator_code = #{operator_code}
+			AND area_code = #{area_code}
+			AND DATE_FORMAT(due_time,'%Y%m%d%H%i%S') = #{due_time}
+			<if test="unit_price != null">
+				and unit_price = #{unit_price}
+			</if>
+		</where>
+	</update>
+
+	<!--Mod by lpjLiu 2017-05-23 增加单价查询条件-->
+  	<update id="addAgentPoolRemainNum">
+		UPDATE 
+			t_sms_oem_agent_pool
+		<set>
+			<if test="remain_number != null">
+				remain_number = remain_number + #{remain_number},
+			</if>
+			<if test="remain_amount != null">
+				remain_amount = remain_amount + #{remain_amount},
+			</if>
+		</set>
+		<where>
+			agent_id = #{agent_id}
+			AND product_type = #{product_type}
+			AND operator_code = #{operator_code}
+			AND area_code = #{area_code}
+			AND DATE_FORMAT(due_time,'%Y%m%d%H%i%S') = #{due_time}
+			<if test="unit_price != null">
+				and unit_price = #{unit_price}
+			</if>
+		</where>
+	</update>
+
+	<select id="queryAgentPoolId" resultType="map">
+		SELECT
+		agent_pool_id
+		FROM
+		t_sms_oem_agent_pool
+		<where>
+			agent_id = #{agent_id} And status=0
+			AND product_type = #{product_type}
+			AND operator_code = #{operator_code}
+			AND area_code = #{area_code}
+			AND DATE_FORMAT(due_time,'%Y%m%d%H%i%S') = #{due_time}
+			<if test="unit_price != null">
+				and unit_price = #{unit_price}
+			</if>
+		</where>
+	</select>
+	
+	<!--Mod by lpjLiu 2017-05-23 增加单价纬度-->
+	<select id="queryClientPoolNum" resultType="map">
+		SELECT 
+			count(*) as num
+		FROM 
+			t_sms_oem_client_pool 
+		<where>
+			client_id = #{client_id} And status=0
+			AND product_type = #{product_type}
+			AND DATE_FORMAT(due_time,'%Y%m%d%H%i%S') = #{due_time}
+			AND operator_code=#{operator_code}
+			AND area_code=#{area_code}
+			<if test="unit_price != null">
+				and unit_price = #{unit_price}
+			</if>
+		</where>
+	</select>
+
+	<select id="queryClientPoolId" resultType="map">
+		SELECT
+		client_pool_id
+		FROM
+		t_sms_oem_client_pool
+		<where>
+			client_id = #{client_id} And status=0
+			AND product_type = #{product_type}
+			AND operator_code=#{operator_code}
+			AND area_code=#{area_code}
+			AND DATE_FORMAT(due_time,'%Y%m%d%H%i%S') = #{due_time}
+			<if test="unit_price != null">
+				and unit_price = #{unit_price}
+			</if>
+		</where>
+	</select>
+
+	<insert id="insertOemClientPool" useGeneratedKeys="true" keyProperty="client_pool_id">
+		INSERT INTO t_sms_oem_client_pool (
+			client_id,
+			product_type,
+			due_time,
+			status,
+			total_number,
+			remain_number,
+			<if test="unit_price != null" >
+				unit_price,
+			</if>
+			total_amount,
+			remain_amount,
+			update_time,
+			operator_code,
+			area_code,
+			remark
+			)
+		VALUES(
+			#{client_id},
+			#{product_type},
+			#{due_time},
+			#{status},
+			#{total_number},
+			#{remain_number},
+			<if test="unit_price != null" >
+				#{unit_price},
+			</if>
+			#{total_amount},
+			#{remain_amount},
+			#{update_time},
+			#{operator_code},
+			#{area_code},
+			#{remark}
+			)
+	</insert>
+
+	<!--Mod by lpjLiu 2017-05-24 增加单价纬度查询，修改状态码-->
+	<update id="addclientPoolRemainNum">
+		UPDATE 
+			t_sms_oem_client_pool
+		<set>
+			<if test="total_number != null">
+				total_number = total_number + #{total_number},
+			</if>
+			<if test="remain_number != null">
+				remain_number = remain_number + #{remain_number},
+			</if>
+			<if test="total_amount != null">
+				total_amount = total_amount + #{total_amount},
+			</if>
+			<if test="remain_amount != null">
+				remain_amount = remain_amount + #{remain_amount},
+			</if>
+			<if test="update_time != null">
+				update_time = #{update_time},
+			</if>
+			<if test="status != null">
+				status = #{status},
+			</if>
+		</set>
+		<where>
+			client_id = #{client_id}
+			AND product_type = #{product_type}
+			AND operator_code=#{operator_code}
+			AND area_code=#{area_code}
+			AND DATE_FORMAT(due_time,'%Y%m%d%H%i%S') = #{due_time}
+			<if test="unit_price != null">
+				and unit_price = #{unit_price}
+			</if>
+		</where>
+	</update>
+	
+	<update id="reduceclientPoolRemainNum">
+		UPDATE 
+			t_sms_oem_client_pool
+		<set>
+			<if test="remain_number != null">
+				remain_number = remain_number - #{remain_number},
+			</if>
+			<if test="remain_amount != null">
+				remain_amount = remain_amount - #{remain_amount},
+			</if>
+			<if test="update_time != null">
+				update_time = #{update_time},
+			</if>
+		</set>
+		WHERE
+			client_id = #{client_id} 
+		AND product_type = #{product_type}
+		AND operator_code=#{operator_code}
+		AND area_code=#{area_code}
+		AND DATE_FORMAT(due_time,'%Y%m%d%H%i%S') = #{due_time}
+		<if test="remain_number != null">
+			and remain_number - #{remain_number} >= 0
+		</if>
+		<if test="unit_price != null">
+			and unit_price = #{unit_price}
+		</if>
+	</update>
+	
+	<select id="querySmsAccount" resultType="map">
+		SELECT 
+			name 
+		FROM 
+			t_sms_account 
+		WHERE 
+			clientid = #{client_id}
+	</select>
+	
+	<select id="queryOemDataConfigByAgentId" resultType="map">
+		SELECT 
+			domain_name
+		FROM 
+			t_sms_oem_data_config 
+		WHERE 
+			agent_id = #{agent_id}
+	</select>
+	
+	
+	<select id="getExtendportAssign" resultType="map">
+	  		SELECT 
+	  			`extendtype`,
+				`extendname`,
+				`startnumber`,
+				`endnumber`,
+				`currentnumber`,
+				`reusenumber`,
+				`status`,
+				`remark`,
+				`updatetime`
+	  		FROM 
+	  			t_sms_extendport_assign 
+	  		WHERE
+	  			extendtype = #{extendtype}
+	  			and status = 0
+	  			limit 1
+	  </select>
+	  
+	  <update id="updateExtendportAssign">
+	  		UPDATE 
+	  			t_sms_extendport_assign
+	  		<set>
+				<if test="reusenumber != null">
+					reusenumber = #{reusenumber},
+				</if>
+				<if test="currentnumber != null">
+					currentnumber = #{currentnumber},
+				</if>
+				<if test="status != null">
+					status = #{status}
+				</if>
+	  		</set>
+	  		<where>
+	  			extendtype = #{extendtype}
+	  			<if test="oldReusenumber != null">
+	  				and reusenumber = #{oldReusenumber}
+	  			</if>
+	  			<if test="oldCurrentnumber != null">
+	  				and currentnumber = #{oldCurrentnumber}
+	  			</if>
+	  			<if test="oldStatus != null">
+	  				and status = #{oldStatus}
+	  			</if>
+	  		</where>
+	  </update>
+
+<!-- 分页 -->
+
+	<sql id="queryFieldOem">
+		t.phone AS phone,
+		t.content AS content,
+		CASE t.state
+		WHEN 0 THEN "发送中"
+		WHEN 1 THEN "未知"
+		WHEN 3 THEN "发送成功"
+		WHEN 4 THEN "发送失败"
+		WHEN 5 THEN "拦截"
+		WHEN 6 THEN "发送失败"
+		WHEN 7 THEN "拦截"
+		WHEN 8 THEN "拦截"
+		WHEN 9 THEN "拦截"
+		WHEN 10 THEN "拦截"
+		END AS status,
+		t.errorcode,
+		CASE WHEN t.state IN (0,1,3) THEN "-"
+			WHEN t.state = 6 THEN CONCAT("其它错误",IFNULL(t.report,""))
+			WHEN t.state = 4 THEN CONCAT("其它错误",IFNULL(t.submit, ""))
+			WHEN t.errorcode = 'YX:1000' THEN "系统超频错误"
+			WHEN t.errorcode = 'YX:5009' THEN "订单余额不足"
+			WHEN t.errorcode = 'YX:7000' THEN "审核不通过"
+			WHEN t.errorcode = 'YX:9001' THEN "号码格式错误"
+			WHEN t.errorcode = 'YX:9002' THEN "账号不存在"
+			WHEN t.errorcode = 'YX:9004' THEN "无可用通道组"
+			WHEN t.errorcode = 'YX:9006' THEN "无可选用通道"
+		    ELSE CONCAT("其它错误", IFNULL(t.errorcode,""))
+		END AS	errorcode_name,
+		/*IF(t.date IS NULL,'',DATE_FORMAT(t.date,'%Y-%m-%d
+		%H:%i:%S')) AS subTime,*/
+		IF(t.date IS
+		NULL,'',DATE_FORMAT(t.date,'%Y-%m-%d
+		%H:%i:%S')) AS sendTime,
+		CASE t.state
+		WHEN 0 THEN 0
+		WHEN 1 THEN t.charge_num
+		WHEN 3 THEN
+		t.charge_num
+		WHEN 4 THEN t.charge_num
+		WHEN 5 THEN 0
+		WHEN 6 THEN
+		t.charge_num
+		WHEN 7 THEN 0
+		WHEN 8 THEN 0
+		WHEN 9 THEN 0
+		WHEN 10 THEN
+		IF(t.isoverratecharge = 1,t.charge_num,0)
+		END AS charge_num
+	</sql>
+
+	<select id="queryCustomerSendRecord" resultType="map">
+		SELECT
+		<include refid="queryFieldOem" />
+		FROM
+		(
+			SELECT
+			r.phone,
+			r.content,
+			r.state,
+			r.report,
+			r.submit,
+			r.errorcode,
+			r.date,
+			r.submitdate,
+			r.charge_num,
+			r.isoverratecharge
+			FROM
+			${table} r
+			where
+			clientid = #{account_id}
+			<if test="createStartTime != null and createEndTime != null">
+			AND date BETWEEN #{createStartTime} AND #{createEndTime}
+			</if>
+			<if test="phone != null and phone != ''">
+			AND phone LIKE CONCAT("%",#{phone},"%")
+			</if>
+			<if test="content != null and content != ''">
+			AND content LIKE CONCAT("%",#{content},"%")
+			</if>
+			<if test="send_status != null and send_status !='' ">
+			AND state in(${send_status})
+			</if>
+		) t
+		where
+		t.date between #{createStartTime} and #{createEndTime}
+		ORDER BY t.date
+		DESC
+		${limit}
+	</select>
+
+
+	<select id="queryAll" resultType="map">
+		SELECT
+		content,
+		phone,
+		state,
+		date,
+		submitdate,
+		COUNT(1) AS totalCount
+		FROM
+		${table}
+		where
+		clientid = #{account_id}
+		<!-- and
+		date between #{createStartTime}
+		and #{createEndTime} -->
+		<if test="createStartTime != null and createEndTime != null">
+			AND date BETWEEN #{createStartTime} AND #{createEndTime}
+		</if>
+		<if test="phone != null and phone != ''">
+			AND phone LIKE CONCAT("%",#{phone},"%")
+		</if>
+		<if test="content != null and content != ''">
+			AND content LIKE CONCAT("%",#{content},"%")
+		</if>
+		<if test="state != null and state !='' ">
+			AND state in(${state})
+		</if>
+	</select>
+
+
+	<sql id="queryFieldOem1">
+		t.phone AS phone,
+		t.content AS content,
+		t.submitdate AS sendTime,
+		CASE t.state
+			WHEN 0 THEN "发送中"
+			WHEN 1 THEN "未知"
+			WHEN 3 THEN "发送成功"
+			WHEN 4 THEN "发送失败"
+			WHEN 5 THEN "拦截"
+			WHEN 6 THEN "发送失败"
+			WHEN 7 THEN "拦截"
+			WHEN 8 THEN "拦截"
+			WHEN 9 THEN "拦截"
+			WHEN 10 THEN "拦截"
+		END AS status,
+		
+		CASE WHEN t.state IN (0,1,3) THEN "-"
+			WHEN t.state = 6 THEN CONCAT("其它错误",IFNULL(t.report,""))
+			WHEN t.state = 4 THEN CONCAT("其它错误",IFNULL(t.submit, ""))
+			WHEN t.errorcode = 'YX:1000' THEN "系统超频错误"
+			WHEN t.errorcode = 'YX:5009' THEN "订单余额不足"
+			WHEN t.errorcode = 'YX:7000' THEN "审核不通过"
+			WHEN t.errorcode = 'YX:9001' THEN "号码格式错误"
+			WHEN t.errorcode = 'YX:9002' THEN "账号不存在"
+			WHEN t.errorcode = 'YX:9004' THEN "无可用通道组"
+			WHEN t.errorcode = 'YX:9006' THEN "无可选用通道"
+		    ELSE CONCAT("其它错误", IFNULL(t.errorcode,""))
+		END AS	errorcode_name,
+		/*IF(t.date IS NULL,'',DATE_FORMAT(t.date,'%Y-%m-%d
+		%H:%i:%S')) AS subTime,*/
+		IF(t.date IS	NULL,'',DATE_FORMAT(t.date,'%Y-%m-%d	%H:%i:%S')) AS sendTime,
+		CASE t.state
+		WHEN 0 THEN 0
+		WHEN 1 THEN t.charge_num
+		WHEN 3 THEN	t.charge_num
+		WHEN 4 THEN t.charge_num
+		WHEN 5 THEN 0
+		WHEN 6 THEN	t.charge_num
+		WHEN 7 THEN 0
+		WHEN 8 THEN 0
+		WHEN 9 THEN 0
+		WHEN 10 THEN
+		IF(t.isoverratecharge = 1,t.charge_num,0)
+		END AS charge_num
+	</sql>
+		<select id="querySmsRecord4Excell" resultType="map">
+		SELECT
+		<include refid="queryFieldOem1" />
+		FROM
+		(
+			SELECT
+			r.phone,
+			r.content,
+			r.state,
+			r.report,
+			r.submit,
+			r.errorcode,
+			r.date,
+			r.submitdate,
+			r.charge_num,
+			r.isoverratecharge
+			FROM
+			${table} r
+			where
+			clientid = #{account_id}
+			<if test="createStartTime != null and createEndTime != null">
+			AND date BETWEEN #{createStartTime} AND #{createEndTime}
+			</if>
+			<if test="phone != null and phone != ''">
+			AND phone LIKE CONCAT("%",#{phone},"%")
+			</if>
+			<if test="content != null and content != ''">
+			AND content LIKE CONCAT("%",#{content},"%")
+			</if>
+			<if test="send_status != null and send_status !='' ">
+			AND state in(${send_status})
+			</if>
+		) t
+		where
+		t.date between #{createStartTime} and #{createEndTime}
+		ORDER BY t.date
+		DESC
+		
+	</select>
+
+
+	<select id="queryWeekSubmitNumber" resultType="java.lang.Integer">
+		SELECT
+		SUM(usersmstotal)
+		FROM t_sms_access_channel_statistics
+		WHERE operatorstype != 4 AND stattype = 0 AND date = #{date}
+		<if test="agentId != null and agentId != ''">
+			and agent_id = #{agentId}
+		</if>
+		<if test="clientid != null and clientid != ''">
+			and clientid = #{clientid}
+		</if>
+	</select>
+
+
+
+</mapper> 

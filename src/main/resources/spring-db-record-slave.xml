@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd">
+
+	<!-- ucpaas_message_record 从库配置 START -->
+	<bean id="record_slave_dataSource" parent="dataSourceParent">
+		<property name="jdbcUrl" value="${record_slave.jdbc.url}" />
+		<property name="username" value="${record_slave.jdbc.username}" />
+		<property name="password" value="${record_slave.jdbc.password}" />
+	</bean>
+
+	<!-- 配置mybitasSqlSessionFactoryBean -->
+	<bean id="record_slave_sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="record_slave_dataSource" />
+		<property name="configLocation" value="classpath:mybatis-config.xml" />
+		<property name="mapperLocations" value="classpath*:mapper/**/*Mapper.xml" />
+		<property name="plugins">
+			<ref bean="jsmsPageInterceptor" />
+		</property>
+	</bean>
+
+	<!-- 配置SqlSessionTemplate -->
+	<bean id="record_slave_sqlSessionTemplate" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg name="sqlSessionFactory" ref="record_slave_sqlSessionFactory" />
+	</bean>
+
+	<!-- 事务配置 -->
+	<bean id="record_slave_transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="record_slave_dataSource" />
+	</bean>
+
+	<!-- 使用annotation注解方式配置事务 -->
+	<tx:annotation-driven transaction-manager="record_slave_transactionManager" />
+</beans>

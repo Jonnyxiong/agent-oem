@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 代理商平台 : 客户管理 -->
+<mapper namespace="com.ucpaas.sms.mapper.message.ClientIdSequenceMapper">
+
+	<!-- 获取未使用序列中的最小的序列 -->
+	<select id="getUnusedMin" resultType="ClientIdSequence">
+		SELECT
+			MIN(id)  as "id",
+		  seq.clientid as "clientId"
+		FROM
+			t_sms_clientid_sequence seq
+		WHERE
+			seq.status = 0 AND seq.lock = 0
+	</select>
+
+	<select id="getUnusedRandom" resultType="ClientIdSequence">
+		SELECT
+			id,
+		    seq.clientid  as "clientId"
+		FROM
+			t_sms_clientid_sequence seq
+		WHERE
+			seq.status = 0 AND seq.lock = 0  AND seq.clientid_type = 0 AND seq.clientid LIKE 'b%'
+		ORDER BY rand() LIMIT 1
+	</select>
+
+	<!-- clientId 加锁-->
+	<update id="lock">
+		UPDATE t_sms_clientid_sequence seq
+		SET 
+			seq.lock = 1,
+			seq.lock_start_time = NOW()
+		WHERE
+			seq.clientid = #{clientId}
+	</update>
+	
+	<!-- 获取当前(已使用)序列中id值最大的数据 -->
+	<select id="getMax" resultType="string">
+		SELECT MAX(e.clientid) as clientid from (
+			SELECT
+				MAX(clientid) AS clientid
+			FROM
+				t_sms_clientid_sequence
+			WHERE clientid_type = 0 AND clientid like 'b%'
+				UNION
+			SELECT
+				MAX(clientid) AS clientid
+			FROM
+					t_sms_account
+			WHERE clientid like 'b%'
+		) e
+	</select>
+	
+	<!-- 添加数据到clientid序列 -->
+	<insert id="batchAdd">
+		INSERT INTO
+			t_sms_clientid_sequence (clientid,status)
+		VALUES
+			<foreach collection="list" item="clientId" separator=",">
+			(#{clientId},0)
+			</foreach>
+	</insert>
+	
+	<!-- 修改clientid序列状态,已经使用的序列状态码更新为:1 -->
+	<update id="updateStatus">
+		UPDATE
+			t_sms_clientid_sequence 
+		SET
+			status = 1
+		WHERE
+		 	clientid = #{clientId}
+	</update>
+	
+</mapper> 

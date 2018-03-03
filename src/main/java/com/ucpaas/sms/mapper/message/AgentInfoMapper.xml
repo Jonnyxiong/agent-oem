@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ucpaas.sms.mapper.message.AgentInfoMapper">
+
+    <sql id="agentInfoColumns">
+        a.`agent_id` as "agentId",
+        a.`admin_id` as "adminId",
+        a.`agent_name` as "agentName",
+        a.`shorter_name` as "shorterName",
+        a.`agent_type` as "agentType",
+        a.`status`,
+        a.`oauth_status` as "oauthStatus",
+        a.`oauth_date` as "oauthDate",
+        a.`address`,
+        a.`company`,
+        a.`company_nbr` as "companyNbr",
+        a.`mobile`,
+        a.`belong_sale` as "belongSale",
+        a.`create_time` as "createTime",
+        a.`update_time` as "updateTime",
+        a.`remark`,
+        a.`rebate_use_radio` as "rebateUseRadio"
+    </sql>
+
+    <sql id="agentInfoJoins">
+    </sql>
+
+    <sql id="agentInfoCondition">
+    </sql>
+
+    <update id="updateBaseInfo">
+        UPDATE t_sms_agent_info SET
+            agent_name = #{agentName},
+            mobile = #{mobile}
+        WHERE admin_id = #{adminId}
+    </update>
+
+    <!-- 更新代理商信息  -->
+    <update id="afterAuthToUpdateCompany">
+        UPDATE
+          t_sms_agent_info
+        SET
+          company = #{company},oauth_status = 2
+        <if test="updateTime != null">
+            ,update_time = #{updateTime}
+        </if>
+        WHERE agent_id = #{agentId}
+    </update>
+
+    <!-- 获取未通过认证的信息 -->
+    <select id="getAuthFailCauseByUser" resultType="String">
+		SELECT
+			ol.remark
+		FROM
+			t_sms_oauth_audit_log ol
+		WHERE
+			id = (
+				SELECT
+					MAX(id)
+				FROM t_sms_oauth_audit_log l
+				INNER JOIN t_sms_agent_info i ON l.agent_id = i.agent_id
+				WHERE l.audit_type = 1
+					AND i.admin_id = #{adminId}
+			)
+		LIMIT 1
+	</select>
+
+    <select id="getByUserId" resultType="AgentInfo">
+        SELECT
+          <include refid="agentInfoColumns"/>
+        FROM
+          t_sms_agent_info a
+        WHERE
+          a.admin_id = #{adminId}
+    </select>
+
+    <!-- 获取代理商的基本信息并包装一下-->
+    <select id="getAgentInfoAndPackage" resultType="map">
+        SELECT
+          a.agent_id,
+          a.agent_name,
+          a.shorter_name,
+          CASE a.agent_type
+            WHEN 1 THEN
+            '个人代理商'
+            WHEN 2 THEN
+            '企业代理商'
+            WHEN 3 THEN
+            '资源合作商'
+            WHEN 4 THEN
+            '代理商和资源合作'
+          END AS agent_type,
+          CASE a.status
+            WHEN 0 THEN
+            '注册未激活'
+            WHEN 1 THEN
+            '注册完成'
+            WHEN 5 THEN
+            '冻结'
+            WHEN 6 THEN
+            '注销'
+          END AS status,
+          CASE a.oauth_status
+            WHEN 2 THEN
+            '待认证'
+            WHEN 3 THEN
+            '认证通过'
+            WHEN 4 THEN
+            '认证不通过'
+          END AS oauth_status,
+          date_format(a.oauth_date,'%Y-%m-%d %H:%i:%S') AS oauth_date,
+          a.address,
+          a.company_nbr,
+          date_format(a.update_time,'%Y-%m-%d %H:%i:%S') AS update_time,
+          a.remark,
+          truncate(IFNULL(balance,0), 2) AS balance,
+          truncate(IFNULL(t.credit_balance,0), 2) AS credit_balance,
+          truncate(IFNULL(t.accumulated_income ,0), 2) AS accumulated_income,
+          truncate(IFNULL(t.commission_income,0), 2) AS commission_income,
+          truncate(IFNULL(t.rebate_income,0), 2) AS rebate_income,
+          date_format(a.create_time,'%Y-%m-%d %H:%i:%S') AS create_time,
+          p.id_nbr,
+          CASE p.id_type
+            WHEN 1 THEN '身份证'
+            WHEN 11 THEN '身份证正面'
+            WHEN 10 THEN '身份证背面'
+            WHEN 2 THEN '护照'
+            WHEN 3 THEN '组织机构证'
+            WHEN 4 THEN '税务登记证'
+            WHEN 5 THEN '营业执照'
+            WHEN 6 THEN '三证合一'
+            WHEN 7 THEN '四证合一'
+            WHEN 8 THEN '等级证书号'
+          END AS id_type
+        FROM
+          t_sms_agent_info a
+          INNER JOIN t_sms_agent_account t ON a.agent_id = t.agent_id
+          LEFT JOIN	t_sms_oauth_pic p ON p.agent_id = a.agent_id AND p.oauth_type = 1
+        WHERE
+          a.admin_id = #{adminId}
+         ORDER BY p.update_date desc
+         limit 1
+    </select>
+
+    <select id="findList" resultType="AgentInfo">
+        SELECT
+        <include refid="agentInfoColumns"/>
+        FROM
+        t_sms_agent_info a
+        WHERE
+        a.agent_type = 5 and a.oauth_status = 3 and a.`status` in (1,5)
+    </select>
+
+</mapper>
+

@@ -1,0 +1,74 @@
+.login-timeout{
+    position: fixed;
+    z-index:99999;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background-color: rgba(0,0,0,.5);
+    display: none;
+}
+.login-timeout .timeout-ctx{
+    position: absolute;
+    z-index:99999;
+    top:50%;
+    left:50%;
+    width:500px;
+    height:306px;
+    margin-top:-160px;
+    margin-left:-250px;
+    background-color: #FFF;
+}
+.login-timeout .timeout-ctx .timeout-header{
+    height:36px;
+    line-height: 36px;
+    padding:0 15px;
+    background-color: #e7e7e7;
+}
+.login-timeout .timeout-ctx .step1{
+    padding-bottom:60px;  
+}
+.login-timeout .timeout-ctx .step1 p{
+    line-height: 170px;
+}
+.login-timeout .timeout-ctx .step1 .btn{
+    display:block;
+    width:266px;
+    margin:0 auto;
+}
+
+.login-timeout .step2 {
+    display: none;
+}
+.login-timeout .step2 .ctx{
+    padding-top:65px;
+    padding-bottom:40px;
+}
+.login-timeout .step2 .item{
+    width:350px;
+    margin: 0 auto 10px auto;
+}
+.login-timeout .step2 .ctx .title{
+    line-height: 32px;
+    width:50px;
+    text-align: right;
+}
+.login-timeout .step2 .ctx .input{
+    width:300px;
+}
+.login-timeout .step2 .ctx .btn{
+  
+    display: block;
+    width:260px;
+    margin:0 auto;
+}
+.login-timeout .step2 .ctx p{
+    visibility: hidden;
+    color:red;
+    line-height: 20px;
+    margin-top:25px;
+    margin-bottom:12px;
+}
+.error_page{
+    display: none;
+}

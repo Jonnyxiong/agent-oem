@@ -1,0 +1,22 @@
+<!DOCTYPE html><html><head><meta content=webkit name=renderer><meta charset=utf-8><title>用户中心</title><meta http-equiv=X-UA-Compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content=""><link rel=stylesheet href=/static/styles/font-awesome.min.css><link rel=stylesheet href=/static/styles/timeout.css><link rel=stylesheet href=/static/upload/webuploader.css><link href=/static/css/app.968a2c48d2e6450d18454fcfcbfc9609.css rel=stylesheet></head><body><div id=notIE9><div id=app></div></div><div class=login-timeout id=_timeout><div class=timeout-ctx><div class=step1 id=step1><div class=timeout-header>提示</div><div class=ctx><p class=tx-c>登录超时，请重新登录</p><a href=javascript:; class="btn btn-green btn-lg" id=relogin>重新登录</a></div></div><div class=step2 id=step2><div class=timeout-header>重新登录</div><div class=ctx><div class="clearfix item"><div class="fl title">账号：</div><input type=text placeholder=请输入账号 id=account class="fl input input-md"></div><div class="clearfix item"><div class="fl title">密码：</div><input type=password placeholder=请输入密码 id=pwd class="fl input input-md"></div><p class=tx-c id=timeoutip>登录失败</p><a href=javascript:; class="btn btn-green btn-lg" id=submit>立即登录</a></div></div></div></div><div class=error_page><ul style="overflow: hidden;"><li class=num><img alt=404 src=/static/images/404.png></li><li class=txt><h2>亲爱的客户，</h2><h2>您的浏览器版本过低，请使用谷歌，火狐，ie9以上的浏览器，如果您使用360，搜狗等浏览器，请使用极速模式</h2><div><div class=error-btns><a href=http://rj.baidu.com/soft/detail/14744.html?ald class=success-btn>点击下载最新版本的浏览器</a></div></div></li></ul><div class=icp><p>&copy; 2016 ucpaas.com 版权所有 粤ICP备14046848号</p></div></div><script type=text/javascript src=/static/js/manifest.a6519e345bdfa5f27932.js></script><script type=text/javascript src=/static/js/vendor.27a4360d445824f001d5.js></script><script type=text/javascript src=/static/js/app.91d4ab40a142dd01e9d5.js></script></body><script type=text/javascript src=/static/scripts/jquery.min.js></script><script type=text/javascript src=/static/scripts/md5.js></script><script type=text/javascript src=/static/scripts/relogin.js></script><script type=text/javascript src=/static/scripts/lineChart.js></script><script type=text/javascript src=/static/scripts/clipboard.min.js></script><script type=text/javascript src=/static/scripts/echarts.common.min.js></script><script type=text/javascript src=/static/upload/webuploader.min.js></script><script type=text/javascript src=/static/scripts/jsms_utils.js></script><script>Date.prototype.Format = function(fmt) { //author: meizz 
+        var o = {
+            "M+": this.getMonth() + 1, //月份 
+            "d+": this.getDate(), //日 
+            "h+": this.getHours(), //小时 
+            "m+": this.getMinutes(), //分 
+            "s+": this.getSeconds(), //秒 
+            "q+": Math.floor((this.getMonth() + 3) / 3), //季度 
+            "S": this.getMilliseconds() //毫秒 
+        };
+        if (/(y+)/.test(fmt)) fmt = fmt.replace(RegExp.$1, (this.getFullYear() + "").substr(4 - RegExp.$1.length));
+        for (var k in o)
+            if (new RegExp("(" + k + ")").test(fmt)) fmt = fmt.replace(RegExp.$1, (RegExp.$1.length == 1) ? (o[k]) : (("00" + o[k]).substr(("" + o[k]).length)));
+        return fmt;
+    }
+    String.prototype.trim = function() {
+        return this.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
+    }
+
+    function _format(s) {
+        return s.toString().replace(/^(\d)$/, '0$1')
+    }</script></html>

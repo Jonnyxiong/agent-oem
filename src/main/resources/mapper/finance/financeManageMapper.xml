@@ -1,0 +1,1261 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 代理商平台 : 客户管理 -->
+<mapper namespace="finance">
+
+	<sql id="queryAgentBalanceBillListCondition">
+		<if test="order_id != null  and order_id != ''">
+			and ( order_id like CONCAT('%',#{order_id},'%' ) or paymentId like CONCAT('%',#{order_id},'%' ) )
+		</if>
+		<if test="payment_type != null  and payment_type != ''">
+			<choose>
+				<when test="payment_type==0">
+					and payment_type in (0,11)
+				</when>
+				<otherwise>
+					and payment_type = #{payment_type}
+				</otherwise>
+			</choose>
+
+		</if>
+		<if test="financial_type != null  and financial_type != '' ">
+			and financial_type = #{financial_type}
+		</if>
+
+	</sql>
+
+	<!-- Mod by lpjLiu 2017-05-24 修改查询方式
+	<select id="queryAgentBalanceBillList" resultType="map">
+		SELECT
+			id,
+			agent_id,
+			payment_type,
+			case payment_type
+				when 0 then '充值'
+				when 1 then '扣减'
+				when 2 then '佣金转余额'
+				when 3 then '购买产品包'
+				when 4 then '退款'
+				else '赠送'
+			end as payment_type_str,
+			financial_type,
+			case financial_type
+				when 0 then '入账'
+				else '出账'
+			end as financial_type_str,
+			amount,
+			case financial_type
+				when 0 then CONCAT('+',amount)
+				else CONCAT('-',amount)
+			end as amount_str,
+			balance,
+			date_format(create_time,'%Y-%m-%d %H:%i:%S') as create_time,
+			order_id,
+			admin_id,
+			client_id,
+			remark
+		FROM
+			t_sms_agent_balance_bill
+		<where>
+			1 = 1 and agent_id = #{agent_id}
+			<include refid="queryAgentBalanceBillListCondition" />
+		</where>
+		ORDER BY create_time DESC
+		${limit}
+	</select>
+
+	<select id="queryAgentBalanceBillListCount" resultType="map">
+		SELECT COUNT(0) AS totalCount from(
+		SELECT
+		0
+		FROM
+		t_sms_agent_balance_bill
+		<where>
+			1 = 1 and agent_id = #{agent_id}
+			<include refid="queryAgentBalanceBillListCondition" />
+		</where>
+		) m
+	</select>
+
+	<select id="queryAgentBalanceBillListForAll" resultType="map">
+		SELECT
+			id,
+			agent_id,
+			payment_type,
+			case payment_type
+				when 0 then '充值'
+				when 1 then '扣减'
+				when 2 then '佣金转余额'
+				when 3 then '购买产品包'
+				when 4 then '退款'
+				else '赠送'
+			end as payment_type_str,
+			financial_type,
+			case financial_type
+				when 0 then '入账'
+				else '出账'
+			end as financial_type_str,
+			amount,
+			case financial_type
+				when 0 then CONCAT('+',amount)
+				else CONCAT('-',amount)
+			end as amount_str,
+			balance,
+			date_format(create_time,'%Y-%m-%d %H:%i:%S') as create_time,
+			order_id,
+			admin_id,
+			client_id,
+			remark
+		FROM
+			t_sms_agent_balance_bill
+		<where>
+			1 = 1 and agent_id = #{agent_id}
+			<include refid="queryAgentBalanceBillListCondition" />
+		</where>
+		ORDER BY create_time DESC
+	</select>
+	-->
+
+	<select id="getUserInfoByUserId" resultType="map">
+		SELECT
+		id,
+		realname
+		FROM
+		t_sms_user
+		WHERE
+		id IN
+		<foreach collection="userIdList" item="item" open="(" separator="," close=")">
+			#{item}
+		</foreach>
+	</select>
+
+	<select id="queryAgentBalanceBillList" resultType="map">
+		select * from (
+		select
+		c.id,
+		c.agent_id,
+		c.payment_type,
+		case c.payment_type
+		when 0 then '充值'
+		when 1 then '扣减'
+		when 2 then '佣金转余额'
+		when 3 then '购买产品包'
+		when 4 then '退款'
+		when 6 then '后付费子账户消耗'
+		when 7 then '回退条数'
+		when 8 then '后付费子账户条数返还'
+		when 9 then '增加授信'
+		when 10 then '降低授信'
+		when 5 then '赠送'
+		when 11 then '充值'
+		end as payment_type_str,
+		c.financial_type,
+		case c.financial_type
+		when 0 then '入账'
+		else '出账'
+		end as financial_type_str,
+		c.amount as "amount",
+		case c.financial_type
+		when 0 then CONCAT('+',c.amount)
+		else CONCAT('-',c.amount)
+		end as amount_str,
+		c.balance,
+		date_format(c.create_time,'%Y-%m-%d %H:%i:%S') as create_time,
+		c.order_no as "order_id",
+		c.admin_id,
+		c.client_id,
+		c.remark as "remark",
+		c.payment_id as "paymentId"
+		from (
+		select a.id, a.agent_id, a.payment_type, a.financial_type, a.balance, a.amount, a.create_time, b.order_no, a.admin_id, a.client_id, a.remark,a.payment_id from t_sms_agent_balance_bill a
+		left join t_sms_oem_agent_order b on b.order_id = a.order_id
+		where a.agent_id = #{agent_id}
+		ORDER BY a.create_time desc
+		) c
+
+		GROUP by c.id
+		) e
+		<where>
+			1 = 1
+			<include refid="queryAgentBalanceBillListCondition" />
+		</where>
+		ORDER BY create_time DESC,id DESC
+		${limit}
+	</select>
+
+	<select id="queryAgentBalanceBillListCount" resultType="map">
+		select
+		count(0) as totalCount
+		from (
+		select
+		c.order_no as "order_id",
+		c.payment_type,
+		c.financial_type,
+		c.payment_id as "paymentId"
+		from (
+		select a.id, b.order_no, a.payment_type, a.financial_type,a.payment_id  from t_sms_agent_balance_bill a
+		left join t_sms_oem_agent_order b on b.order_id = a.order_id
+		where a.agent_id = #{agent_id}
+		) c
+
+		GROUP by c.id
+		) e
+		<where>
+			1 = 1
+			<include refid="queryAgentBalanceBillListCondition" />
+		</where>
+	</select>
+
+	<select id="queryAgentBalanceBillListForAll" resultType="map">
+		select * from (
+		select
+		c.id,
+		c.agent_id,
+		c.payment_type,
+		case c.payment_type
+		when 0 then '充值'
+		when 1 then '扣减'
+		when 2 then '佣金转余额'
+		when 3 then '购买产品包'
+		when 4 then '退款'
+		when 6 then '后付费子账户消耗'
+		when 7 then '回退条数'
+		when 8 then '后付费子账户条数返还'
+		when 9 then '增加授信'
+		when 10 then '降低授信'
+		when 5 then '赠送'
+		when 11 then '充值'
+		end as payment_type_str,
+		c.financial_type,
+		case c.financial_type
+		when 0 then '入账'
+		else '出账'
+		end as financial_type_str,
+		c.amount as "amount",
+		case c.financial_type
+		when 0 then CONCAT('+',c.amount)
+		else CONCAT('-',c.amount)
+		end as amount_str,
+		c.balance,
+		date_format(c.create_time,'%Y-%m-%d %H:%i:%S') as create_time,
+		c.order_no as "order_id",
+		c.admin_id,
+		c.client_id,
+		c.remark as "remark"
+		from (
+		select a.id, a.agent_id, a.payment_type, a.financial_type, a.balance, a.amount, a.create_time, b.order_no, a.admin_id, a.client_id, a.remark from t_sms_agent_balance_bill a
+		left join t_sms_oem_agent_order b on b.order_id = a.order_id
+		where a.agent_id = #{agent_id}
+		ORDER BY a.create_time desc
+		) c
+
+		GROUP by c.id		) e
+		<where>
+			1 = 1
+			<include refid="queryAgentBalanceBillListCondition" />
+		</where>
+		ORDER BY create_time DESC,id DESC
+	</select>
+
+	<!-- Mod by lpjLiu 2017-05-24 修改查询方式
+	<sql id="queryAgentRebateBillListCondition">
+		<if ClientSuccessRateRealtimeDTO="id != null">
+			and id = #{id}
+		</if>
+		<if ClientSuccessRateRealtimeDTO="payment_type != null">
+			and payment_type = #{payment_type}
+		</if>
+		<if ClientSuccessRateRealtimeDTO="financial_type != null">
+			and financial_type = #{financial_type}
+		</if>
+	</sql>
+
+	<select id="queryAgentRebateBillList" resultType="map">
+		SELECT
+			id,
+			agent_id,
+			payment_type,
+			case payment_type
+				when 0 then '返点收入'
+				else '抵扣'
+			end as payment_type_str,
+			financial_type,
+			case financial_type
+				when 0 then '入账'
+				else '出账'
+			end as financial_type_str,
+			order_id,
+			amount,
+			case financial_type
+				when 0 then CONCAT('+',amount)
+				else CONCAT('-',amount)
+			end as amount_str,
+			balance,
+			date_format(create_time,'%Y-%m-%d %H:%i:%S') as create_time,
+			remark
+		FROM
+			t_sms_agent_rebate_bill
+		<where>
+			1 = 1 and agent_id = #{agent_id}
+			<include refid="queryAgentRebateBillListCondition" />
+		</where>
+		ORDER BY create_time DESC
+		${limit}
+	</select>
+
+	<select id="queryAgentRebateBillListCount" resultType="map">
+		SELECT COUNT(0) AS totalCount from(
+			SELECT
+				0
+			FROM
+				t_sms_agent_rebate_bill
+			<where>
+				1 = 1 and agent_id = #{agent_id}
+				<include refid="queryAgentRebateBillListCondition" />
+			</where>
+		) m
+	</select>
+
+	<select id="queryAgentRebateBillListForAll" resultType="map">
+		SELECT
+			id,
+			agent_id,
+			payment_type,
+			case payment_type
+				when 0 then '返点收入'
+				else '抵扣'
+			end as payment_type_str,
+			financial_type,
+			case financial_type
+				when 0 then '入账'
+				else '出账'
+			end as financial_type_str,
+			order_id,
+			amount,
+			case financial_type
+				when 0 then CONCAT('+',amount)
+				else CONCAT('-',amount)
+			end as amount_str,
+			balance,
+			date_format(create_time,'%Y-%m-%d %H:%i:%S') as create_time,
+			remark
+		FROM
+			t_sms_agent_rebate_bill
+		<where>
+			1 = 1 and agent_id = #{agent_id}
+			<include refid="queryAgentRebateBillListCondition" />
+		</where>
+		ORDER BY create_time DESC
+	</select>
+	-->
+
+	<sql id="queryAgentRebateBillListCondition">
+		<if test="id != null and id != ''">
+			and order_id like CONCAT('%',#{id},'%' )
+		</if>
+		<if test="payment_type != null and payment_type != ''">
+			and payment_type = #{payment_type}
+		</if>
+		<if test="financial_type != null and financial_type != ''">
+			and financial_type = #{financial_type}
+		</if>
+	</sql>
+
+	<select id="queryAgentRebateBillList" resultType="map">
+		select * from (
+		select
+		c.id,
+		c.agent_id,
+		c.payment_type,
+		case c.payment_type
+		when 0 then '返点收入'
+		else '抵扣'
+		end as payment_type_str,
+		c.financial_type,
+		case c.financial_type
+		when 0 then '入账'
+		else '出账'
+		end as financial_type_str,
+		IFNULL(d.amount,c.amount) as "amount",
+		case c.financial_type
+		when 0 then CONCAT('+',IFNULL(d.amount,c.amount))
+		else CONCAT('-',IFNULL(d.amount,c.amount))
+		end as amount_str,
+		c.balance,
+		date_format(c.create_time,'%Y-%m-%d %H:%i:%S') as create_time,
+		c.order_no as "order_id",
+		IFNULL(d.remark,c.remark) as "remark"
+		from (
+		select a.id, a.agent_id, a.payment_type, a.financial_type, a.balance,a.amount, a.create_time, b.order_no, a.remark from t_sms_agent_rebate_bill a
+		left join t_sms_oem_agent_order b on b.order_id = a.order_id
+		where a.agent_id = #{agent_id}
+		ORDER BY a.create_time desc
+		) c
+		left join (
+		select b.order_no, sum(a.amount) as "amount", GROUP_CONCAT(a.remark) as "remark"
+		from t_sms_agent_rebate_bill a
+		left join t_sms_oem_agent_order b on b.order_id = a.order_id
+		where a.agent_id = #{agent_id} group by b.order_no
+		) d on d.order_no = c.order_no
+		GROUP by IFNULL(c.order_no,c.id)
+		) e
+		<where>
+			1 = 1
+			<include refid="queryAgentRebateBillListCondition" />
+		</where>
+		ORDER BY create_time DESC
+		${limit}
+	</select>
+
+	<select id="queryAgentRebateBillListCount" resultType="map">
+		select
+		count(0) as totalCount
+		from (
+		select
+		c.order_no as "order_id",
+		c.payment_type,
+		c.financial_type
+		from (
+		select a.id,b.order_no, a.payment_type, a.financial_type from t_sms_agent_rebate_bill a
+		left join t_sms_oem_agent_order b on b.order_id = a.order_id
+		where a.agent_id = #{agent_id}
+		) c
+		left join (
+		select b.order_no
+		from t_sms_agent_rebate_bill a
+		left join t_sms_oem_agent_order b on b.order_id = a.order_id
+		where a.agent_id = #{agent_id}
+		group by b.order_no
+		) d on d.order_no = c.order_no
+		GROUP by IFNULL(c.order_no,c.id)
+		) e
+		<where>
+			1 = 1
+			<include refid="queryAgentRebateBillListCondition" />
+		</where>
+	</select>
+
+	<select id="queryAgentRebateBillListForAll" resultType="map">
+		select * from (
+		select
+		c.id,
+		c.agent_id,
+		c.payment_type,
+		case c.payment_type
+		when 0 then '返点收入'
+		else '抵扣'
+		end as payment_type_str,
+		c.financial_type,
+		case c.financial_type
+		when 0 then '入账'
+		else '出账'
+		end as financial_type_str,
+		IFNULL(d.amount,c.amount) as "amount",
+		case c.financial_type
+		when 0 then CONCAT('+',IFNULL(d.amount,c.amount))
+		else CONCAT('-',IFNULL(d.amount,c.amount))
+		end as amount_str,
+		c.balance,
+		date_format(c.create_time,'%Y-%m-%d %H:%i:%S') as create_time,
+		c.order_no as "order_id",
+		IFNULL(d.remark,c.remark) as "remark"
+		from (
+		select a.id, a.agent_id, a.payment_type, a.financial_type, a.balance, a.amount, a.create_time, b.order_no, a.remark from t_sms_agent_rebate_bill a
+		left join t_sms_oem_agent_order b on b.order_id = a.order_id
+		where a.agent_id = #{agent_id}
+		ORDER BY a.create_time desc
+		) c
+		left join (
+		select b.order_no, sum(a.amount) as "amount", GROUP_CONCAT(a.remark) as "remark"
+		from t_sms_agent_rebate_bill a
+		left join t_sms_oem_agent_order b on b.order_id = a.order_id
+		where a.agent_id = #{agent_id} group by b.order_no
+		) d on d.order_no = c.order_no
+		GROUP by IFNULL(c.order_no,c.id)
+		) e
+		<where>
+			1 = 1
+			<include refid="queryAgentRebateBillListCondition" />
+		</where>
+		ORDER BY create_time DESC
+	</select>
+
+	<!-- Mod by lpjLiu 2017-05-24 修改查询
+	<sql id="queryAgentOrderInfoListCondition">
+
+		<if ClientSuccessRateRealtimeDTO="orderInfo != null">
+			and (
+					order_id like CONCAT('%',#{orderInfo},'%' )
+					or client_id like CONCAT('%',#{orderInfo},'%' )
+					or name like CONCAT('%',#{orderInfo},'%' )
+				)
+		</if>
+		<if ClientSuccessRateRealtimeDTO="order_type != null">
+			and order_type = #{order_type}
+		</if>
+		<if ClientSuccessRateRealtimeDTO="start_time_day != null">
+			and create_time >= STR_TO_DATE(#{start_time_day},'%Y-%m-%d %H:%i:%S')
+		</if>
+		<if ClientSuccessRateRealtimeDTO="end_time_day != null">
+			and create_time <![CDATA[<= STR_TO_DATE(#{end_time_day},'%Y-%m-%d %H:%i:%S') ]]>
+		</if>
+
+	</sql>
+
+	<select id="queryAgentOrderInfoList" resultType="map">
+		SELECT
+			order_id,
+			order_type,
+			case order_type
+				when 1 then '-'
+				else '+'
+			end as sms_balance_change_flag,
+			case order_type
+				when 0 then 'OEM代理商购买'
+				when 1 then 'OEM代理商给客户充值'
+				else 'OEM代理商给客户回退'
+			end as order_type_str,
+			product_id,
+			product_code,
+			product_type,
+			case product_type
+				when 0 then '验证码/通知短信'
+				when 1 then '会员营销短信'
+				else '国际短信'
+			end as product_type_str,
+			case product_type
+				when 2 then order_amount
+				else order_number
+			end as sms_balance_change_amount,
+			product_name,
+			unit_price,
+			order_number,
+			order_amount,
+			product_price,
+			agent_id,
+			client_id,
+			name,
+			date_format(due_time,'%Y-%m-%d %H:%i:%S') as due_time,
+			date_format(create_time,'%Y-%m-%d %H:%i:%S') as create_time,
+			remark
+		FROM
+			t_sms_oem_agent_order
+		<where>
+			1 = 1 and agent_id = #{agent_id}
+			<include refid="queryAgentOrderInfoListCondition" />
+		</where>
+		ORDER BY create_time DESC
+		${limit}
+	</select>
+
+
+	<select id="queryAgentOrderInfoListCount" resultType="map">
+		SELECT COUNT(0) AS totalCount from(
+			SELECT
+				0
+			FROM
+				t_sms_oem_agent_order
+			<where>
+				1 = 1 and agent_id = #{agent_id}
+				<include refid="queryAgentOrderInfoListCondition" />
+			</where>
+		) m
+	</select>
+
+	<select id="queryAgentOrderInfoListForAll" resultType="map">
+		SELECT
+			order_id,
+			order_type,
+			case order_type
+				when 1 then '-'
+				else '+'
+			end as sms_balance_change_flag,
+			case order_type
+				when 0 then '代理商购买'
+				when 1 then '代理商分发'
+				else 'OEM代理商回退'
+			end as order_type_str,
+			product_id,
+			product_code,
+			product_type,
+			case product_type
+				when 0 then '行业'
+				when 1 then '营销'
+				else '国际'
+			end as product_type_str,
+			case product_type
+				when 2 then order_amount
+				else order_number
+			end as sms_balance_change_amount,
+			case
+				when order_type = 1 and product_type = 2 then CONCAT('-',order_amount,'元' )
+				when order_type = 1 and product_type != 2 then CONCAT('-',order_number,'条' )
+				when order_type != 1 and product_type = 2 then CONCAT('+',order_amount,'元' )
+				when order_type != 1 and product_type != 2 then CONCAT('+',order_number,'条' )
+			end as change_amount,
+			product_name,
+			unit_price,
+			order_number,
+			order_amount,
+			product_price,
+			agent_id,
+			client_id,
+			name,
+			date_format(due_time,'%Y-%m-%d %H:%i:%S') as due_time,
+			date_format(create_time,'%Y-%m-%d %H:%i:%S') as create_time,
+			remark
+		FROM
+			t_sms_oem_agent_order
+		<where>
+			1 = 1 and agent_id = #{agent_id}
+			<include refid="queryAgentOrderInfoListCondition" />
+		</where>
+		ORDER BY create_time DESC
+	</select>
+	-->
+	<sql id="queryAgentOrderInfoListCondition">
+		<if test="orderInfo != null">
+			and (
+			order_no like CONCAT('%',#{orderInfo},'%' )
+			or client_id like CONCAT('%',#{orderInfo},'%' )
+			or name like CONCAT('%',#{orderInfo},'%' )
+			)
+		</if>
+		<if test="order_type != null and order_type != ''">
+			and order_type = #{order_type}
+		</if>
+		<if test="start_time_day != null and start_time_day != ''">
+			and create_time >= STR_TO_DATE(#{start_time_day},'%Y-%m-%d %H:%i:%S')
+		</if>
+		<if test="end_time_day != null  and end_time_day != ''">
+			and create_time <![CDATA[<= STR_TO_DATE(#{end_time_day},'%Y-%m-%d %H:%i:%S') ]]>
+		</if>
+	</sql>
+
+	<select id="queryAgentOrderInfoList" resultType="map">
+		SELECT
+		order_id,
+		order_type,
+		case order_type
+		when 1 then '-'
+		when 3 then '-'
+		else '+'
+		end as sms_balance_change_flag,
+		case order_type
+		when 0 then '短信购买'
+		when 1 then '子账户充值'
+		when 2 then '子账户回退'
+		when 3 then '回退条数'
+		end as order_type_str,
+		product_id,
+		product_code,
+		case operator_code
+		when 0 then '全国'
+		when 1 then '移动'
+		when 2 then '联通'
+		when 3 then '电信'
+		when 4 then '国际'
+		else '-'
+		end as operator_code_str,
+		product_type,
+		area_code,
+		case area_code
+		when 0 then '全国'
+		when 1 then '国际'
+		else '-'
+		end as area_code_str,
+		case product_type
+		when 0 then '行业'
+		when 1 then '会员营销短信'
+		when 3 then '验证码'
+		when 4 then '通知'
+		when 2 then '国际'
+		else '-'
+		end as product_type_str,
+		case product_type
+		when 2 then product_price
+		else order_number
+		end as sms_balance_change_amount,
+		product_name,
+		unit_price,
+		order_number as order_number,
+		order_amount as order_amount,
+		product_price,
+		agent_id,
+		client_id,
+		name,
+		date_format(due_time,'%Y-%m-%d %H:%i:%S') as due_time,
+		date_format(create_time,'%Y-%m-%d %H:%i:%S') as create_time,
+		remark,
+		order_no
+		FROM
+		t_sms_oem_agent_order
+		<where>
+			1 = 1 and agent_id = #{agent_id}
+			<include refid="queryAgentOrderInfoListCondition" />
+		</where>
+		ORDER BY create_time DESC,order_id DESC
+		${limit}
+	</select>
+
+	<select id="queryAgentOrderInfoListCount" resultType="map">
+		SELECT COUNT(0) AS totalCount from(
+		SELECT
+		0
+		FROM
+		t_sms_oem_agent_order
+		<where>
+			1 = 1 and agent_id = #{agent_id}
+			<include refid="queryAgentOrderInfoListCondition" />
+		</where>
+
+		) m
+	</select>
+
+	<select id="queryAgentOrderInfoListForAll" resultType="map">
+		SELECT
+			order_id,
+			order_type,
+			case order_type
+				when 1 then '-'
+				when 3 then '-'
+				else '+'
+			end as sms_balance_change_flag,
+			case order_type
+				when 0 then '短信购买'
+				when 1 then '子账户充值'
+				when 2 then '子账户回退'
+				when 3 then '回退条数'
+			end as order_type_str,
+			product_id,
+			product_code,
+			case operator_code
+				when 0 then '全国'
+				when 1 then '移动'
+				when 2 then '联通'
+				when 3 then '电信'
+				when 4 then '国际'
+				else '-'
+			end as operator_code_str,
+			case area_code
+				when 0 then '全国'
+				when 1 then '国际'
+				else '-'
+			end as area_code_str,
+			product_type,
+			case product_type
+				when 0 then '行业'
+				when 1 then '会员营销短信'
+				when 3 then '验证码'
+				when 4 then '通知'
+				when 2 then '国际'
+				else '-'
+			end as product_type_str,
+			case product_type
+				when 2 then product_price
+				else order_number
+			end as sms_balance_change_amount,
+			product_name,
+			unit_price,
+			order_number as order_number,
+			order_amount as order_amount,
+			product_price,
+			agent_id,
+			client_id,
+			name,
+		case name
+		when '云之讯' then ''
+		else name
+		end as names,
+			date_format(due_time,'%Y-%m-%d %H:%i:%S') as due_time,
+			date_format(create_time,'%Y-%m-%d %H:%i:%S') as create_time,
+			remark,
+			order_no,
+			case product_type
+				when 2 then '元'
+				else '条'
+			end as sms_balance_change_amount_unit
+		FROM
+			t_sms_oem_agent_order
+		<where>
+			1 = 1 and agent_id = #{agent_id}
+			<include refid="queryAgentOrderInfoListCondition" />
+		</where>
+
+		ORDER BY create_time DESC,order_id DESC
+	</select>
+
+	<select id="queryAgentAccountInfo" resultType="map">
+		SELECT
+		agent_id,
+		CASE
+		when balance>0 THEN truncate(IFNULL(balance,0),2)+truncate(IFNULL(current_credit,0),2)
+		ELSE truncate(IFNULL(current_credit,0),2)
+		End as available_line,
+		truncate(IFNULL(balance,0),2) as balance,
+		truncate(IFNULL(credit_balance,0),2) as credit_balance,
+		truncate(IFNULL(history_payment,0),2) as history_payment,
+		truncate(IFNULL(current_credit,0),2) as current_credit,
+		truncate(IFNULL(no_back_payment,0),2) as no_back_payment,
+		truncate(IFNULL(commission_income,0),2) as commission_income,
+		truncate(IFNULL(rebate_income,0),2) as rebate_income,
+		truncate(IFNULL(deposit,0),2) as deposit,
+		truncate(IFNULL(accumulated_recharge,0),2) as accumulated_recharge,
+		truncate(IFNULL(accumulated_consume,0),2) as accumulated_consume,
+		truncate(IFNULL(accumulated_income,0),2) as accumulated_income,
+		truncate(IFNULL(accumulated_rebate_income,0),2) as accumulated_rebate_income,
+		truncate(IFNULL(accumulated_rebate_pay,0),2) as accumulated_rebate_pay
+		FROM
+		t_sms_agent_account
+		WHERE
+		agent_id = #{agent_id}
+	</select>
+
+
+	<select id="queryAgentAccountStatistics" resultType="map">
+		SELECT
+		agent_id,
+		hy_total_purchase_number,
+		hy_remain_rebate_number,
+		yx_total_purchase_number,
+		yx_remain_rebate_number,
+		FORMAT(gj_total_purchase_amount,2) as gj_total_purchase_amount,
+		FORMAT(gj_remain_rebate_amount,2) as gj_remain_rebate_amount,
+		yzm_total_purchase_number,
+		yzm_remain_rebate_number,
+		tz_total_purchase_number,
+		tz_remain_rebate_number
+		FROM
+		t_sms_oem_agent_account_statistics
+		WHERE
+		agent_id = #{agent_id}
+	</select>
+
+	<select id="queryAgentPoolRemainNum" resultType="map">
+		SELECT
+		MAX(CASE t1.product_type WHEN 0 THEN t1.remain_number ELSE 0 END ) as hy_remain_num,
+		MAX(CASE t1.product_type WHEN 1 THEN t1.remain_number ELSE 0 END ) as yx_remain_num,
+		MAX(CASE t1.product_type WHEN 3 THEN t1.remain_number ELSE 0 END ) as yzm_remain_num,
+		MAX(CASE t1.product_type WHEN 4 THEN t1.remain_number ELSE 0 END ) as tz_remain_num,
+		TRUNCATE(MAX(CASE t1.product_type WHEN 2 THEN t1.remain_amount ELSE 0 END ),2) as gj_remain_amount
+		FROM (
+		SELECT
+		t.product_type,
+		sum(t.remain_number) as remain_number,
+		sum(t.remain_amount) as remain_amount
+		FROM
+		`t_sms_oem_agent_pool` t
+		WHERE
+		t.status = 0 and
+		t.agent_id = #{agent_id}
+		<![CDATA[
+					and due_time > NOW()
+				]]>
+		GROUP BY t.product_type
+		) t1
+	</select>
+
+	<select id="queryAgentPoolRemainNumFordueTime" resultType="map">
+		SELECT
+		MAX(CASE t1.product_type WHEN 0 THEN t1.remain_number ELSE 0 END ) as hy_remain_num,
+		MAX(CASE t1.product_type WHEN 1 THEN t1.remain_number ELSE 0 END ) as yx_remain_num,
+		MAX(CASE t1.product_type WHEN 3 THEN t1.remain_number ELSE 0 END ) as yzm_remain_num,
+		MAX(CASE t1.product_type WHEN 4 THEN t1.remain_number ELSE 0 END ) as tz_remain_num,
+		ROUND(MAX(CASE t1.product_type WHEN 2 THEN t1.remain_amount ELSE 0 END ),2) as gj_remain_amount
+		FROM (
+		SELECT
+		t.product_type,
+		sum(t.remain_number) as remain_number,
+		sum(t.remain_amount) as remain_amount
+		FROM
+		`t_sms_oem_agent_pool` t
+		WHERE
+		t.agent_id = #{agent_id}
+		AND status = 0
+		AND datediff(due_time,now()) <![CDATA[< 30 ]]>
+		GROUP BY t.product_type
+		) t1
+	</select>
+	<!--OEM代理商剩余过期短信-->
+	<select id="queryCustomerForBalanceDetails" resultType="map">
+
+		SELECT
+		t.product_type,
+		case t.product_type
+		when 0 then '行业'
+		when 1 then '会员营销短信'
+		when 3 then '验证码'
+		when 4 then '通知'
+		when 2 then '国际'
+		else '-'
+		end as product_type_str,
+		t.operator_code,
+		case t.operator_code
+		when 0 then '全网'
+		when 1 then '移动'
+		when 2 then '联通'
+		when 3 then '电信'
+		when 4 then '国际'
+		else '-'
+		end as operator_code_str,
+		t.area_code,
+		case t.area_code
+		when 0 then '全国'
+		when 1 then '国际'
+		else '-'
+		end as area_code_str,
+		t.unit_price,
+		case t.product_type
+		when 2 then '-'
+		else CONCAT(t.unit_price,'元/条')
+		end as sms_unitprice,
+		case t.product_type
+		when 2 then CONCAT(CONVERT(SUM(t.remain_amount),CHAR),'元')
+		else CONCAT(CONVERT(SUM(t.remain_number),CHAR),'条')
+		end as account_balance,
+		date_format(due_time,'%Y-%m-%d') as due_time,
+		0 as dead
+		FROM
+		`t_sms_oem_agent_pool` t
+		WHERE
+		t.agent_id = #{agent_id}
+		AND status = 0
+		AND datediff(due_time,now()) <![CDATA[< 30 ]]>
+		<include refid="queryCustomerForBalanceDetailsCondition" />
+		GROUP BY t.product_type,t.area_code,t.operator_code,t.unit_price,t.due_time
+
+		union ALL
+		SELECT
+		t.product_type,
+		case t.product_type
+		when 0 then '行业'
+		when 1 then '会员营销短信'
+		when 3 then '验证码'
+		when 4 then '通知'
+		when 2 then '国际'
+		else '-'
+		end as product_type_str,
+		t.operator_code,
+		case t.operator_code
+		when 0 then '全网'
+		when 1 then '移动'
+		when 2 then '联通'
+		when 3 then '电信'
+		when 4 then '国际'
+		else '-'
+		end as operator_code_str,
+		t.area_code,
+		case t.area_code
+		when 0 then '全国'
+		when 1 then '国际'
+		else '-'
+		end as area_code_str,
+		t.unit_price,
+		case t.product_type
+		when 2 then '-'
+		else CONCAT(t.unit_price,'元/条')
+		end as sms_unitprice,
+		case t.product_type
+		when 2 then CONCAT(CONVERT(SUM(t.remain_amount),CHAR),'元')
+		else CONCAT(CONVERT(SUM(t.remain_number),CHAR),'条')
+		end as account_balance,
+		date_format(due_time,'%Y-%m-%d') as due_time,
+		1 as dead
+		FROM
+		`t_sms_oem_agent_pool` t
+		WHERE
+		t.agent_id =#{agent_id}
+		AND status = 0
+		AND datediff(due_time,now()) <![CDATA[ >= 30 ]]>
+		<include refid="queryCustomerForBalanceDetailsCondition" />
+		GROUP BY t.product_type,t.area_code,t.operator_code,t.unit_price,t.due_time
+	</select>
+
+	<sql id="queryCustomerForBalanceDetailsCondition">
+
+		<if test="product_type != null and product_type!=''">
+			and t.product_type = #{product_type}
+		</if>
+		<if test="operator_code != null and operator_code !='' ">
+			and t.operator_code = #{operator_code}
+		</if>
+	</sql>
+
+	<select id="queryCustomerForBalanceDetailTotal" resultType="map">
+		SELECT
+		IfNUll((t2.hy_remain_num+t2.yx_remain_num+t2.co_remain_num+t2.no_remain_num),0) as num,
+		IfNUll(t2.gj_remain_amount,0) as mon
+		from
+		(
+		SELECT
+		sum(CASE t1.product_type WHEN 0 THEN t1.remain_number ELSE 0 END ) as hy_remain_num,
+		sum(CASE t1.product_type WHEN 1 THEN t1.remain_number ELSE 0 END ) as yx_remain_num,
+		sum(CASE t1.product_type WHEN 3 THEN t1.remain_number ELSE 0 END ) as co_remain_num,
+		sum(CASE t1.product_type WHEN 4 THEN t1.remain_number ELSE 0 END ) as no_remain_num,
+		ROUND(sum(CASE t1.product_type WHEN 2 THEN t1.remain_amount ELSE 0 END ),2) as gj_remain_amount
+		from
+		(
+		SELECT
+		t.product_type,
+		t.operator_code,
+		t.area_code,
+		unit_price,
+		SUM(t.remain_number) AS remain_number,
+		SUM(t.remain_amount) AS remain_amount
+		FROM `t_sms_oem_agent_pool` t
+		WHERE
+		t.agent_id =#{agent_id}
+		AND status = 0
+		<include refid="queryCustomerForBalanceDetailsCondition" />
+		)	t1
+		)	t2
+	</select>
+	<select id="queryOemAgentPoolList" resultType="map">
+		SELECT
+		agent_id,
+		product_type,
+		case product_type
+		when 0 then '行业'
+		when 1 then '会员营销短信'
+		when 3 then '验证码'
+		when 4 then '通知'
+		when 2 then '国际'
+		else '-'
+		end as product_type_str,
+		case product_type
+		when 2 then CONCAT(remain_amount,'元')
+		else CONCAT(remain_number,'条')
+		end as account_balance,
+		date_format(due_time,'%Y-%m-%d') as due_time,
+		status,
+		remain_number,
+		remain_amount,
+		update_time,
+		remark
+		FROM
+		t_sms_oem_agent_pool
+		WHERE
+		agent_id = #{agent_id} AND status = 0 AND datediff(due_time,now()) <![CDATA[< 30 ]]>
+		ORDER BY due_time
+	</select>
+
+	<select id="queryOemAgentPoolListCount" resultType="map">
+		SELECT COUNT(0) AS totalCount from(
+		SELECT
+		0
+		FROM
+		t_sms_oem_agent_pool
+		WHERE
+		agent_id = #{agent_id} AND status = 0 AND datediff(due_time,now()) <![CDATA[< 30 ]]>
+		) m
+	</select>
+
+	<select id="queryOemClientPoolList" resultType="map">
+		SELECT
+		client_id,
+		product_type,
+		case product_type
+		when 0 then '行业'
+		when 1 then '会员营销短信'
+		when 3 then '验证码'
+		when 4 then '通知'
+		when 2 then '国际'
+		else '-'
+		end as product_type_str,
+		case product_type
+		when 2 then CONCAT(remain_amount,'元')
+		else CONCAT(remain_number,'条')
+		end as account_balance,
+		date_format(due_time,'%Y-%m-%d') as due_time,
+		status,
+		remain_number,
+		remain_amount,
+		update_time,
+		remark
+		FROM
+		t_sms_oem_client_pool
+		WHERE
+		client_id = #{client_id} AND status = 0
+		<if test="product_type != null  and product_type != ''">
+			and product_type = #{product_type}
+		</if>
+		ORDER BY due_time
+	</select>
+
+	<select id="queryOemClientPoolListCount" resultType="map">
+		SELECT COUNT(0) AS totalCount from(
+		SELECT
+		0
+		FROM
+		t_sms_oem_client_pool
+		WHERE
+		client_id = #{client_id} AND status = 0
+		<if test="product_type != null and product_type != ''">
+			and product_type = #{product_type}
+		</if>
+		) m
+	</select>
+
+<!--客户消费记录-->
+
+	<select id="querypurchaseHistoryList" resultType="map">
+		SELECT
+		ts.client_id,
+		ts.order_type,
+		ta.name ,
+		case ts.order_type
+		when 1 then '短信分发'
+		when 2 then '短信回退'
+		when 3 then '条数返还'
+		end as orderTypeStr,
+		case ts.operator_code
+		when 0 then '全国'
+		when 1 then '移动'
+		when 2 then '联通'
+		when 3 then '电信'
+		when 4 then '国际'
+		else '-'
+		end as operatorCodeStr,
+		ts.product_type,
+		ts.area_code,
+		case ts.area_code
+		when 0 then '全国'
+		when 1 then '国际'
+		else '-'
+		end as areaCodeStr,
+		case ts.product_type
+		when 0 then '行业'
+		when 1 then '会员营销短信'
+		when 3 then '验证码'
+		when 4 then '通知'
+		when 2 then '国际'
+		else '-'
+		end as productTypeStr,
+		unit_price,
+		ts.order_number as order_number,
+		date_format(ts.due_time,'%Y-%m-%d') as due_time,
+		date_format(ts.consumer_date,'%Y-%m-%d') as consumer_date,
+		date_format(ts.create_time,'%Y-%m-%d  %H:%i:%S') as create_time
+		FROM
+		t_sms_oem_client_order ts LEFT JOIN t_sms_account ta on ta.clientid=ts.client_id
+		<where>
+			1 = 1 and ts.agent_id = #{agent_id}
+			<if test="clientid != null and clientid !=''">
+				and ts.client_id = #{clientid}
+			</if>
+			<if test="realname != null and realname !=''">
+				and ta.name LIKE CONCAT('%',#{realname},'%' )
+			</if>
+			<if test="order_type != null and order_type != ''">
+				and ts.order_type = #{order_type}
+			</if>
+			<if test="product_type != null and product_type != ''">
+				and ts.product_type = #{product_type}
+			</if>
+			<if test="start_time_day != null and start_time_day != ''">
+				and ts.create_time >= STR_TO_DATE(#{start_time_day},'%Y-%m-%d %H:%i:%S')
+			</if>
+			<if test="end_time_day != null  and end_time_day != ''">
+				and ts.create_time <![CDATA[<= STR_TO_DATE(#{end_time_day},'%Y-%m-%d %H:%i:%S') ]]>
+			</if>
+		</where>
+		ORDER BY ts.create_time DESC,ts.order_id DESC
+		${limit}
+	</select>
+
+	<select id="querypurchaseHistoryListCount" resultType="map">
+		SELECT COUNT(0) AS totalCount from(
+		SELECT
+		0
+		FROM
+		t_sms_oem_client_order ts LEFT JOIN t_sms_account ta on ta.clientid=ts.client_id
+		<where>
+			1 = 1 and ts.agent_id = #{agent_id}
+			<if test="clientid != null and clientid !=''">
+				and ts.client_id = #{clientid}
+			</if>
+			<if test="realname != null and realname !=''">
+				and ta.name LIKE CONCAT('%',#{realname},'%' )
+			</if>
+			<if test="order_type != null and order_type != ''">
+				and ts.order_type = #{order_type}
+			</if>
+			<if test="product_type != null and product_type != ''">
+				and ts.product_type = #{product_type}
+			</if>
+			<if test="start_time_day != null and start_time_day != ''">
+				and ts.create_time >= STR_TO_DATE(#{start_time_day},'%Y-%m-%d %H:%i:%S')
+			</if>
+			<if test="end_time_day != null  and end_time_day != ''">
+				and ts.create_time <![CDATA[<= STR_TO_DATE(#{end_time_day},'%Y-%m-%d %H:%i:%S') ]]>
+			</if>
+		</where>
+		) m
+	</select>
+	<select id="querypurchaseHistoryForAll" resultType="map">
+		SELECT
+		ts.client_id,
+		ts.order_type,
+		ta.name,
+		case ts.order_type
+		when 1 then '短信分发'
+		when 2 then '短信回退'
+		when 3 then '条数返还'
+		end as orderTypeStr,
+		case ts.operator_code
+		when 0 then '全国'
+		when 1 then '移动'
+		when 2 then '联通'
+		when 3 then '电信'
+		when 4 then '国际'
+		else '-'
+		end as operatorCodeStr,
+		ts.product_type,
+		ts.area_code,
+		case ts.area_code
+		when 0 then '全国'
+		when 1 then '国际'
+		else '-'
+		end as areaCodeStr,
+		case ts.product_type
+		when 0 then '行业'
+		when 1 then '会员营销短信'
+		when 3 then '验证码'
+		when 4 then '通知'
+		when 2 then '国际'
+		else '-'
+		end as productTypeStr,
+		unit_price,
+		ts.order_number as order_number,
+		date_format(ts.due_time,'%Y-%m-%d') as due_time,
+		date_format(ts.consumer_date,'%Y-%m-%d') as consumer_date,
+		date_format(ts.create_time,'%Y-%m-%d  %H:%i:%S') as create_time
+		FROM
+		t_sms_oem_client_order ts LEFT JOIN t_sms_account ta on ta.clientid=ts.client_id
+		<where>
+			1 = 1 and ts.agent_id = #{agent_id}
+			<if test="clientid != null and clientid !=''">
+				and ts.client_id = #{clientid}
+			</if>
+			<if test="realname != null and realname !=''">
+				and ta.name LIKE CONCAT('%',#{realname},'%' )
+			</if>
+			<if test="order_type != null and order_type != ''">
+				and ts.order_type = #{order_type}
+			</if>
+			<if test="product_type != null and product_type != ''">
+				and ts.product_type = #{product_type}
+			</if>
+			<if test="start_time_day != null and start_time_day != ''">
+				and ts.create_time >= STR_TO_DATE(#{start_time_day},'%Y-%m-%d %H:%i:%S')
+			</if>
+			<if test="end_time_day != null  and end_time_day != ''">
+				and ts.create_time <![CDATA[<= STR_TO_DATE(#{end_time_day},'%Y-%m-%d %H:%i:%S') ]]>
+			</if>
+		</where>
+		ORDER BY ts.create_time DESC,ts.order_id DESC
+	</select>
+
+</mapper> 

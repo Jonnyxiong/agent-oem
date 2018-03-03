@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ucpaas.sms.mapper.message.UserMapper">
+
+    <sql id="userColumns">
+        a.`id`,
+        a.`username` as "userName",
+        a.`email`,
+        a.`password`,
+        a.`user_type` as "userType",
+        a.`status`,
+        a.`mobile`,
+        a.`realname` as "realName",
+        a.`create_date` as "createDate",
+        a.`update_date` as "updateDate",
+        a.`login_times` as "loginTimes",
+        a.`web_id` as "webId"
+    </sql>
+
+    <sql id="userJoins">
+    </sql>
+
+    <sql id="userCondition">
+    </sql>
+
+	<select id="getCountByEmail" resultType="Integer">
+		SELECT
+			count(id)
+		FROM
+			t_sms_user
+		WHERE
+			1 = 1 and email = #{email} and web_id = 4
+	</select>
+
+    <select id="getCountByMobileOrEmail" parameterType="User" resultType="Integer">
+      select count(0) from t_sms_user where web_id=4 and id != #{id} AND (mobile = #{mobile} or email = #{email})
+    </select>
+
+    <update id="updateBaseInfo">
+        UPDATE t_sms_user SET
+        email = #{email},
+        mobile = #{mobile},
+        realname = #{realName}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 检验用户密码是否准确 -->
+    <select id="checkOldPassword" resultType="Integer">
+        SELECT
+          COUNT(0) AS count
+        FROM
+          t_sms_user
+        WHERE
+          id = #{id}
+        AND
+          password = #{oldPassword}
+    </select>
+
+    <select id="get" resultType="User">
+        SELECT
+          <include refid="userColumns"/>
+        FROM
+          t_sms_user a
+        WHERE
+          a.id = #{id}
+    </select>
+
+    <!-- 账户管理: 更新账户安全xnxi -->
+    <update id="updatePassword">
+        UPDATE
+          t_sms_user
+        SET
+          password = #{password}
+        WHERE id = #{id}
+    </update>
+
+	<!-- 重置密码 -->
+	 <update id="confirmResetPwd">
+	  	UPDATE
+	  		t_sms_user
+	  	SET
+	  		password = #{password}
+	  	WHERE
+	  		email = #{email} and web_id = 4
+    </update>
+
+    <!-- 更新资质认证信息 -->
+    <update id="updateCerInfo">
+		UPDATE
+		t_sms_oauth_pic p
+		<set>
+			<if test="idNbr != null and idNbr != ''">
+				p.id_nbr = #{idNbr},
+			</if>
+			<if test="imgUrl != null and imgUrl != ''">
+				p.img_url = #{imgUrl},
+			</if>
+			<if test="idType != null and idType != ''">
+				p.id_type = #{idType},
+			</if>
+			p.update_date = #{updateDate}
+		</set>
+		WHERE
+		  p.agent_id = #{agentId}
+	</update>
+
+    <!-- 添加资质认证信息 -->
+    <insert id="saveCerInfo">
+		INSERT INTO t_sms_oauth_pic (
+            agent_id,
+            id_nbr,
+            img_url,
+            id_type,
+            create_date,
+            update_date,
+            oauth_type
+		)
+		VALUE
+		(
+            #{agentId},
+            #{idNbr},
+            #{imgUrl},
+            #{idType},
+            NOW(),
+            #{updateDate},
+            #{oauthType}
+		)
+	</insert>
+
+    <!-- 获取管理员资料 -->
+    <select id="getAdminById" resultType="map">
+		SELECT
+			a.id,
+			a.email,
+			a.mobile,
+			a.realname,
+			c.id as role_id,
+			c.role_name,
+      		d.agent_id
+		FROM
+			t_sms_user a,
+			t_sms_user_role b,
+			t_sms_role c,
+		    t_sms_agent_info d
+		WHERE
+			a.id = b.user_id
+		AND b.role_id = c.id
+		AND a.user_type = 1
+		AND a.id = #{adminId}
+		AND a.web_id = 4
+		AND a.id = admin_id
+	</select>
+
+    <!-- 获取代理商资质信息 -->
+	<select id="getCerInfo" resultType="map">
+		SELECT
+			u.sid,
+			i.agent_id,
+			i.admin_id,
+			i.oauth_status,
+			CASE i.agent_type
+				WHEN 1 THEN '个人代理商'
+				WHEN 2 THEN '企业代理商'
+				WHEN 3 THEN '资源合作商'
+				WHEN 4 THEN '代理商和资源合作'
+			END AS agent_type,
+			p.id_type AS id_typeNum,
+			CASE p.id_type
+				WHEN 1 THEN '身份证'
+				WHEN 11 THEN '身份证正面'
+				WHEN 10 THEN '身份证背面'
+				WHEN 2 THEN '护照'
+				WHEN 3 THEN '组织机构证'
+				WHEN 4 THEN '税务登记证'
+				WHEN 5 THEN '营业执照'
+				WHEN 6 THEN '三证合一'
+				WHEN 7 THEN '四证合一'
+				WHEN 8 THEN '等级证书号'
+			END AS id_type,
+			i.company,
+			CASE
+				WHEN p.agent_id IS NOT NULL THEN '1'
+			ELSE '0'
+			END AS submit,
+			p.id_nbr,
+			DATE_FORMAT(p.create_date,'%Y-%m-%d %H:%i:%S') AS create_date,
+			DATE_FORMAT(p.update_date,'%Y-%m-%d %H:%i:%S') AS update_date,
+			p. STATUS,
+			p.img_url
+		FROM
+			t_sms_user u
+		INNER JOIN t_sms_agent_info i ON u.id = i.admin_id
+		LEFT JOIN t_sms_oauth_pic p ON i.agent_id = p.agent_id AND p.oauth_type = 1
+		WHERE
+			u.id = #{adminId} and p.client_id is null
+            <!-- 		AND u.user_type = 2 -->
+		ORDER BY p.update_date desc
+		LIMIT 1
+    </select>
+
+    <select id="getCerInfoSource" resultType="map">
+		select * from t_sms_oauth_pic where agent_id = #{agentId} and oauth_type = 1 limit 1
+	</select>
+
+	<!--登录时查询用户-->
+	<select id="getUserForLogin" resultType="map">
+		SELECT
+			a.id,
+			a.`status`,
+			a.realname,
+			c.id AS roleId,
+			c.role_name AS roleName,
+			c.`status` AS roleStatus,
+			c.`web_id`
+		FROM
+			t_sms_user a,
+			t_sms_user_role b,
+			t_sms_role c
+		WHERE
+			a.id = b.user_id
+		AND b.role_id = c.id
+		AND a.user_type = 1
+		AND (
+			a.email = #{userName} OR a.mobile = #{userName}
+		)
+		AND a.`password` = #{password}
+		AND a.`web_id` = 4
+		limit 1
+	</select>
+
+	<!-- 查询代理商用户 -->
+	<select id="getUserJoinAgent" resultType="map">
+		SELECT
+			su.id,
+			ai.agent_id,
+			ai.status
+		FROM t_sms_user su
+		INNER JOIN t_sms_agent_info ai ON su.id = ai.admin_id
+		WHERE 1 = 1
+			AND (su.email = #{userName} or su.mobile = #{userName})
+			AND su.`web_id` = 4
+		LIMIT 1
+	</select>
+
+	<!-- 更新登录信息 -->
+	<update id="updateLoginTimes">
+		UPDATE t_sms_user a
+			SET a.login_times = a.login_times + 1
+		WHERE a.id = #{id}
+	</update>
+
+</mapper>
+

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 菜单业务 -->
+<mapper namespace="com.ucpaas.sms.mapper.message.CommonMapper">
+	
+	<!-- 查询邮件模版-->
+	 <select id="querySmsMailProp" resultType="map">
+    	SELECT
+    		frm,
+    		tonbr,
+    		subject,
+    		text,
+    		type
+    	FROM
+    		t_sms_mailprop
+    	WHERE
+    		id = #{id}
+    </select>
+
+	<!-- 获取最多的代理商的月份 -->
+	<select id="getMostAgentNumForMonth" resultType="string">
+	  	SELECT
+	  		MAX(substring(CONCAT(t.agent_id,""),7)) AS num
+	  	FROM
+	  		t_sms_agent_info t
+	  	WHERE 1 = 1
+	  	AND t.agent_id LIKE CONCAT(#{agentIdPre}, '%')
+    </select>
+
+	<!--获取系统参数-->
+	<select id="getSysParams" resultType="map">
+		SELECT
+			param_value,
+			description
+		FROM
+			t_sms_param
+		WHERE
+			param_key = #{paramKey}
+	</select>
+
+</mapper>

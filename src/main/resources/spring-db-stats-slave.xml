@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:tx="http://www.springframework.org/schema/tx" xmlns:mybatis="http://mybatis.org/schema/mybatis-spring"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd http://mybatis.org/schema/mybatis-spring http://mybatis.org/schema/mybatis-spring.xsd">
+
+	<!-- ucpaas_message_access 从库 连接配置 START -->
+	<bean id="stats_slave_dataSource" parent="dataSourceParent">
+		<property name="jdbcUrl" value="${stats_slave.jdbc.url}" />
+		<property name="username" value="${stats_slave.jdbc.username}" />
+		<property name="password" value="${stats_slave.jdbc.password}" />
+	</bean>
+
+	<!-- 配置mybitasSqlSessionFactoryBean -->
+	<bean id="stats_slave_sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="stats_slave_dataSource" />
+		<property name="configLocation" value="classpath:mybatis-config.xml" />
+		<property name="mapperLocations" value="classpath*:mapper/**/*Mapper.xml" />
+		<property name="plugins">
+			<ref bean="jsmsPageInterceptor" />
+		</property>
+
+	</bean>
+
+	<!-- 配置SqlSessionTemplate -->
+	<bean id="stats_slave_sqlSessionTemplate" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg name="sqlSessionFactory" ref="stats_slave_sqlSessionFactory" />
+	</bean>
+    
+	<!-- 事务配置 -->
+	<bean id="stats_slave_transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="stats_slave_dataSource" />
+		<qualifier value="statsSlave"/>
+	</bean>
+
+	<!-- 使用annotation注解方式配置事务 -->
+	<tx:annotation-driven transaction-manager="stats_slave_transactionManager" />
+	<mybatis:scan base-package="com.jsmsframework.stats.mapper"  template-ref="stats_slave_sqlSessionTemplate"/>
+
+</beans>

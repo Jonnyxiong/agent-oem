@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- 代理商平台 : 短信测试 -->
+<mapper namespace="content">
+
+	<!-- 根据clientId查询审核关键字 -->
+	<select id="getAuditKeywordsByClientId" resultType="string">
+		SELECT
+		keyword
+		FROM
+		t_sms_audit_keyword_list WHERE category_id IN (
+		SELECT
+		category_id
+		FROM
+		t_sms_audit_kgroup_ref_category
+		WHERE
+		kgroup_id IN (
+		SELECT
+		kgroup_id
+		FROM
+		t_sms_audit_client_group
+		WHERE
+		cgroup_id IN (
+		SELECT
+		cgroup_id
+		FROM
+		t_sms_audit_cgroup_ref_client
+		WHERE
+		clientid = "*" OR
+		clientid = #{clientid}
+		)
+		)
+		)
+
+	</select>
+
+	<!-- 根据系统关键字查询 -->
+	<select id="getKeyWordlist" resultType="string">
+		SELECT
+		keyword AS keyword
+		FROM
+		t_sms_keyword_list
+	</select>
+
+	<!-- 根据clientid查找cid -->
+	<select id="getChannelId" resultType="int">
+		SELECT
+		cid
+		FROM
+		t_sms_channel_keyword_list
+		WHERE
+		status = "1" and
+		cid in (select c.cid
+		from t_sms_channelgroup a
+		join t_sms_channel_ref_channelgroup b on
+		b.channelgroupid in (select
+		channelid from t_user_gw where userid =
+		#{clientid})
+		join t_sms_channel c on c.cid = b.channelid
+		GROUP BY c.cid)
+	</select>
+	<!-- 根据clientid查找cid -->
+	<select id="getKeyWordChannelList" resultType="string">
+		SELECT
+		keyword AS
+		keyword
+		FROM
+		t_sms_channel_keyword_list
+		WHERE
+		status = "1"
+		AND
+		cid = #{cid}
+	</select>
+
+	<select id="queryUserChannelGroup" resultType="map">
+		SELECT channelid,ydchannelid,ltchannelid,dxchannelid,gjchannelid FROM t_user_gw WHERE userid = #{clientId}
+		LIMIT 1
+	</select>
+	
+	<select id="queryChannelKeywordById" resultType="string">
+		SELECT keyword FROM t_sms_channel_keyword_list WHERE cid = #{channelId} ORDER BY id ASC
+	</select>
+	
+	<select id="queryChannelIdByGroupId" resultType="string">
+		SELECT channelid FROM t_sms_channel_ref_channelgroup WHERE channelgroupid = #{channelGroupId}
+	</select>
+
+
+</mapper> 
